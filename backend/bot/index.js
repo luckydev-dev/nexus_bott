@@ -59,7 +59,28 @@ export function initializeDiscordBot() {
 
   client.once('ready', async () => {
     console.log(`[NexusBot Gateway] Logged in as ${client.user.tag}`);
-    client.user.setActivity('Shielding Guilds • v1.0.0', { type: ActivityType.Watching });
+    
+    // Human-like rotating presence statuses
+    const presenceList = [
+      { name: 'server chat & member safety 🛡️', type: ActivityType.Watching },
+      { name: '/help • /warn • /modlogs', type: ActivityType.Listening },
+      { name: 'for spam & raid attempts', type: ActivityType.Watching },
+      { name: 'Fastest Mod Action', type: ActivityType.Competing },
+      { name: 'Keeping channels clean & safe', type: ActivityType.Custom, state: 'Keeping channels clean & safe 🛡️' }
+    ];
+
+    let presenceIndex = 0;
+    const updatePresence = () => {
+      const p = presenceList[presenceIndex];
+      client.user.setPresence({
+        activities: [p],
+        status: 'online'
+      });
+      presenceIndex = (presenceIndex + 1) % presenceList.length;
+    };
+
+    updatePresence();
+    setInterval(updatePresence, 3 * 60 * 1000); // Rotate every 3 minutes
     
     // Register global interactions/slash commands on the bot client
     client.application.commands.set(commands)

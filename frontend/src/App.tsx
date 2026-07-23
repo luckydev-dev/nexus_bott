@@ -8,7 +8,7 @@ import {
   Server, Settings, Shield, MessageSquare, Key, History, User, Plus, Trash, 
   Lock, Unlock, Save, ExternalLink, Eye, PlusCircle, RefreshCw, Sliders, 
   UserCheck, Bot, Zap, Sparkles, AlertTriangle, Check, CheckCircle, Download, 
-  Upload, X, HelpCircle, Activity, Heart, Bell, Trash2, Send, ChevronRight,
+  Upload, X, HelpCircle, Activity, Heart, Bell, Trash2, Send, ChevronRight, Copy,
   Menu, BookOpen, Wifi, MoreVertical, Edit, UserMinus, Search, Filter, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -341,11 +341,16 @@ export default function App() {
 
   // Notifications / UI feedback
   const [toasts, setToasts] = useState<string[]>([]);
-  const [modalType, setModalType] = useState<'backup-success' | 'restore-confirm' | 'add-warning' | 'add-invite' | 'send-dm' | 'none'>('none');
+  const [modalType, setModalType] = useState<'backup-success' | 'restore-confirm' | 'add-warning' | 'add-invite' | 'send-dm' | 'export-json' | 'import-json' | 'none'>('none');
   const [newBackupCode, setNewBackupCode] = useState<string>('');
   const [restoreCodeInput, setRestoreCodeInput] = useState<string>('');
   const [selectedBackupId, setSelectedBackupId] = useState<string>('');
   const [backupRestriction, setBackupRestriction] = useState<boolean>(true);
+
+  // Search & JSON Export/Import States
+  const [sidebarSearch, setSidebarSearch] = useState<string>('');
+  const [jsonExportString, setJsonExportString] = useState<string>('');
+  const [jsonImportInput, setJsonImportInput] = useState<string>('');
 
   // Form states for dialog modals
   const [formWarnTag, setFormWarnTag] = useState('');
@@ -357,6 +362,131 @@ export default function App() {
   const [formDmEmbed, setFormDmEmbed] = useState<boolean>(false);
   const [newBadWord, setNewBadWord] = useState('');
   const [newRegexPattern, setNewRegexPattern] = useState('');
+
+  // Presets Handler
+  const handleApplyPreset = (preset: 'balanced' | 'strict' | 'relaxed') => {
+    if (preset === 'balanced') {
+      setAutoMod(prev => ({
+        ...prev,
+        enabled: true,
+        spamFilter: true,
+        linkFilter: true,
+        inviteFilter: true,
+        badWordsEnabled: true,
+        maliciousLinkFilter: true,
+        action: 'delete'
+      }));
+      setAntiRaid(prev => ({
+        ...prev,
+        enabled: true,
+        quarantineNewAccounts: true,
+        accountAgeMinDays: 1,
+        action: 'timeout'
+      }));
+      setAntiNuke(prev => ({
+        ...prev,
+        enabled: true,
+        unauthorizedAdminStrip: true,
+        channelCreateThreshold: 3,
+        channelDeleteThreshold: 3,
+        roleCreateThreshold: 3,
+        roleDeleteThreshold: 3
+      }));
+      triggerToast('Applied "Community Standard" preset! Click Save to apply to Discord.');
+    } else if (preset === 'strict') {
+      setAutoMod(prev => ({
+        ...prev,
+        enabled: true,
+        spamFilter: true,
+        linkFilter: true,
+        inviteFilter: true,
+        duplicateFilter: true,
+        capsFilter: true,
+        badWordsEnabled: true,
+        maliciousLinkFilter: true,
+        massMentionLimit: 3,
+        action: 'warn'
+      }));
+      setAntiRaid(prev => ({
+        ...prev,
+        enabled: true,
+        quarantineNewAccounts: true,
+        accountAgeMinDays: 3,
+        captchaVerification: true,
+        action: 'kick'
+      }));
+      setAntiNuke(prev => ({
+        ...prev,
+        enabled: true,
+        unauthorizedAdminStrip: true,
+        preventBotInvites: true,
+        channelCreateThreshold: 1,
+        channelDeleteThreshold: 1,
+        roleCreateThreshold: 1,
+        roleDeleteThreshold: 1,
+        action: 'remove_roles'
+      }));
+      triggerToast('Applied "Strict Defense" preset! Click Save to apply to Discord.');
+    } else if (preset === 'relaxed') {
+      setAutoMod(prev => ({
+        ...prev,
+        enabled: true,
+        spamFilter: false,
+        linkFilter: false,
+        inviteFilter: false,
+        badWordsEnabled: true,
+        maliciousLinkFilter: true,
+        action: 'delete'
+      }));
+      setAntiRaid(prev => ({
+        ...prev,
+        enabled: false,
+        quarantineNewAccounts: false
+      }));
+      setAntiNuke(prev => ({
+        ...prev,
+        enabled: true,
+        unauthorizedAdminStrip: false
+      }));
+      triggerToast('Applied "Relaxed & Casual" preset! Click Save to apply to Discord.');
+    }
+  };
+
+  // Export & Import Config
+  const handleExportConfig = () => {
+    const payload = {
+      guildId: activeGuild?.id,
+      guildName: activeGuild?.name,
+      exportedAt: new Date().toISOString(),
+      automod: autoMod,
+      antiraid: antiRaid,
+      antinuke: antiNuke,
+      whitelist: whitelist,
+      logging: activityLogging
+    };
+    setJsonExportString(JSON.stringify(payload, null, 2));
+    setModalType('export-json');
+  };
+
+  const handleImportConfig = () => {
+    setJsonImportInput('');
+    setModalType('import-json');
+  };
+
+  const submitImportConfig = () => {
+    try {
+      const parsed = JSON.parse(jsonImportInput);
+      if (parsed.automod) setAutoMod(parsed.automod);
+      if (parsed.antiraid) setAntiRaid(parsed.antiraid);
+      if (parsed.antinuke) setAntiNuke(parsed.antinuke);
+      if (parsed.whitelist) setWhitelist(parsed.whitelist);
+      if (parsed.logging) setActivityLogging(parsed.logging);
+      setModalType('none');
+      triggerToast('Configuration imported successfully! Click Save to apply.');
+    } catch (err) {
+      triggerToast('Error: Invalid JSON format. Please check your pasted configuration text.');
+    }
+  };
 
   const triggerToast = (message: string) => {
     setToasts((prev) => [...prev, message]);
@@ -982,93 +1112,125 @@ export default function App() {
 
 
 
+              {/* Sidebar Search Filter */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Filter menu tabs..."
+                  value={sidebarSearch}
+                  onChange={(e) => setSidebarSearch(e.target.value)}
+                  className="w-full bg-[#070709] border border-white/5 hover:border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#5865F2]"
+                />
+                {sidebarSearch && (
+                  <button 
+                    onClick={() => setSidebarSearch('')} 
+                    className="absolute right-2.5 top-2 text-slate-500 hover:text-slate-300"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
               {/* Category: Security */}
-              <nav className="space-y-1">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2 font-display">Security Modules</div>
-                <button
-                  id="nav-automod"
-                  onClick={() => handleMenuClick('automod')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded text-left text-xs transition-all ${
-                    selectedMenu === 'automod' 
-                      ? 'bg-slate-800/50 text-white font-medium border border-white/10' 
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.01]'
-                  }`}
-                >
-                  <NexusIcon name="automod" fallback={<Shield className="w-4 h-4 text-amber-400" />} />
-                  <span>AutoMod</span>
-                </button>
-                <button
-                  id="nav-antiraid"
-                  onClick={() => handleMenuClick('antiraid')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded text-left text-xs transition-all ${
-                    selectedMenu === 'antiraid' 
-                      ? 'bg-slate-800/50 text-white font-medium border border-white/10' 
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.01]'
-                  }`}
-                >
-                  <NexusIcon name="antiraid" fallback={<Zap className="w-4 h-4 text-red-400" />} />
-                  <span>AntiRaid</span>
-                </button>
-                <button
-                  id="nav-antinuke"
-                  onClick={() => handleMenuClick('antinuke')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded text-left text-xs transition-all ${
-                    selectedMenu === 'antinuke' 
-                      ? 'bg-slate-800/50 text-white font-medium border border-white/10' 
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.01]'
-                  }`}
-                >
-                  <NexusIcon name="antinuke" fallback={<Bot className="w-4 h-4 text-[#5865F2]" />} />
-                  <span>AntiNuke</span>
-                </button>
-                <button
-                  id="nav-whitelist"
-                  onClick={() => handleMenuClick('whitelist')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded text-left text-xs transition-all ${
-                    selectedMenu === 'whitelist' 
-                      ? 'bg-slate-800/50 text-white font-medium border border-white/10' 
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.01]'
-                  }`}
-                >
-                  <NexusIcon name="whitelist" fallback={<UserCheck className="w-4 h-4 text-emerald-400" />} />
-                  <span>Whitelist</span>
-                </button>
-              </nav>
+              {(!sidebarSearch || ['automod', 'antiraid', 'antinuke', 'whitelist', 'security'].some(k => k.includes(sidebarSearch.toLowerCase()))) && (
+                <nav className="space-y-1">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2 font-display">Security Protection</div>
+                  {(!sidebarSearch || 'automod filters'.includes(sidebarSearch.toLowerCase())) && (
+                    <button
+                      id="nav-automod"
+                      onClick={() => handleMenuClick('automod')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs transition-all cursor-pointer ${
+                        selectedMenu === 'automod' 
+                          ? 'bg-[#5865F2] text-white font-bold shadow shadow-[#5865F2]/20' 
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <NexusIcon name="automod" fallback={<Shield className="w-4 h-4 text-amber-400" />} />
+                      <span>AutoMod Filters</span>
+                    </button>
+                  )}
+                  {(!sidebarSearch || 'antiraid defense'.includes(sidebarSearch.toLowerCase())) && (
+                    <button
+                      id="nav-antiraid"
+                      onClick={() => handleMenuClick('antiraid')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs transition-all cursor-pointer ${
+                        selectedMenu === 'antiraid' 
+                          ? 'bg-[#5865F2] text-white font-bold shadow shadow-[#5865F2]/20' 
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <NexusIcon name="antiraid" fallback={<Zap className="w-4 h-4 text-red-400" />} />
+                      <span>Anti-Raid Defense</span>
+                    </button>
+                  )}
+                  {(!sidebarSearch || 'antinuke safeguards'.includes(sidebarSearch.toLowerCase())) && (
+                    <button
+                      id="nav-antinuke"
+                      onClick={() => handleMenuClick('antinuke')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs transition-all cursor-pointer ${
+                        selectedMenu === 'antinuke' 
+                          ? 'bg-[#5865F2] text-white font-bold shadow shadow-[#5865F2]/20' 
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <NexusIcon name="antinuke" fallback={<Bot className="w-4 h-4 text-[#5865F2]" />} />
+                      <span>Anti-Nuke Safeguards</span>
+                    </button>
+                  )}
+                  {(!sidebarSearch || 'whitelist exemptions'.includes(sidebarSearch.toLowerCase())) && (
+                    <button
+                      id="nav-whitelist"
+                      onClick={() => handleMenuClick('whitelist')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs transition-all cursor-pointer ${
+                        selectedMenu === 'whitelist' 
+                          ? 'bg-[#5865F2] text-white font-bold shadow shadow-[#5865F2]/20' 
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <NexusIcon name="whitelist" fallback={<UserCheck className="w-4 h-4 text-emerald-400" />} />
+                      <span>Whitelist & Exemptions</span>
+                    </button>
+                  )}
+                </nav>
+              )}
 
-              {/* Category: Core Services */}
-              <nav className="space-y-1">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2 font-display">Core Services</div>
+              {/* Category: System Logs & Infractions */}
+              {(!sidebarSearch || ['audit', 'warnings', 'logs', 'infractions'].some(k => k.includes(sidebarSearch.toLowerCase()))) && (
+                <nav className="space-y-1">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2 font-display">Logs & Infractions</div>
 
-                <button
-                  id="nav-audit"
-                  onClick={() => handleMenuClick('audit')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded text-left text-xs transition-all ${
-                    selectedMenu === 'audit' 
-                      ? 'bg-slate-800/50 text-white font-medium border border-white/10' 
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.01]'
-                  }`}
-                >
-                  <NexusIcon name="audit" fallback={<History className="w-4 h-4 text-sky-400" />} />
-                  <span>Audit Logs</span>
-                </button>
-              </nav>
+                  {(!sidebarSearch || 'audit logs history'.includes(sidebarSearch.toLowerCase())) && (
+                    <button
+                      id="nav-audit"
+                      onClick={() => handleMenuClick('audit')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs transition-all cursor-pointer ${
+                        selectedMenu === 'audit' 
+                          ? 'bg-[#5865F2] text-white font-bold shadow shadow-[#5865F2]/20' 
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <NexusIcon name="audit" fallback={<History className="w-4 h-4 text-sky-400" />} />
+                      <span>System Audit Logs</span>
+                    </button>
+                  )}
 
-              {/* Category: Infractions */}
-              <nav className="space-y-1">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2 font-display">Infractions</div>
-                <button
-                  id="nav-warnings"
-                  onClick={() => handleMenuClick('warnings')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded text-left text-xs transition-all ${
-                    selectedMenu === 'warnings' 
-                      ? 'bg-slate-800/50 text-white font-medium border border-white/10' 
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.01]'
-                  }`}
-                >
-                  <NexusIcon name="warning" fallback={<AlertTriangle className="w-4 h-4 text-yellow-500" />} />
-                  <span>Warnings</span>
-                </button>
-              </nav>
+                  {(!sidebarSearch || 'warning tickets infractions'.includes(sidebarSearch.toLowerCase())) && (
+                    <button
+                      id="nav-warnings"
+                      onClick={() => handleMenuClick('warnings')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs transition-all cursor-pointer ${
+                        selectedMenu === 'warnings' 
+                          ? 'bg-[#5865F2] text-white font-bold shadow shadow-[#5865F2]/20' 
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <NexusIcon name="warning" fallback={<AlertTriangle className="w-4 h-4 text-amber-400" />} />
+                      <span>Member Warnings</span>
+                    </button>
+                  )}
+                </nav>
+              )}
 
               {/* Host Environment Widget */}
               <div className="mt-auto border-t border-white/5 pt-4 px-2 space-y-3">
@@ -2395,6 +2557,112 @@ export default function App() {
                   className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold font-display uppercase tracking-wide text-xs transition"
                 >
                   Confirm Restore
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {modalType === 'export-json' && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#0f0f12] border border-white/10 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl"
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <Download className="w-4 h-4 text-sky-400" />
+                  <h3 className="font-bold text-white text-sm uppercase font-display tracking-wide">Export Server Configuration</h3>
+                </div>
+                <button onClick={() => setModalType('none')} className="text-slate-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
+              </div>
+
+              <p className="text-xs text-slate-400">
+                Below is your active server configuration formatted as clean JSON. You can copy it or save it as a backup file.
+              </p>
+
+              <textarea 
+                readOnly
+                rows={10}
+                value={jsonExportString}
+                className="w-full bg-[#070709] border border-white/10 rounded-xl p-3 text-xs text-slate-300 font-mono focus:outline-none"
+              />
+
+              <div className="flex gap-2.5">
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(jsonExportString);
+                    triggerToast('Configuration JSON copied to clipboard!');
+                  }}
+                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy JSON</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    const blob = new Blob([jsonExportString], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${activeGuild?.name || 'server'}-config-backup.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    triggerToast('Downloaded configuration backup JSON file!');
+                  }}
+                  className="flex-1 py-2 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download .json</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {modalType === 'import-json' && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#0f0f12] border border-white/10 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl"
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-emerald-400" />
+                  <h3 className="font-bold text-white text-sm uppercase font-display tracking-wide">Import Configuration JSON</h3>
+                </div>
+                <button onClick={() => setModalType('none')} className="text-slate-400 hover:text-white cursor-pointer"><X className="w-4 h-4" /></button>
+              </div>
+
+              <p className="text-xs text-slate-400">
+                Paste a previously exported configuration JSON below to restore or migrate settings.
+              </p>
+
+              <textarea 
+                rows={10}
+                value={jsonImportInput}
+                onChange={(e) => setJsonImportInput(e.target.value)}
+                placeholder='Paste raw JSON configuration here...'
+                className="w-full bg-[#070709] border border-white/10 rounded-xl p-3 text-xs text-slate-200 font-mono focus:border-[#5865F2] focus:outline-none"
+              />
+
+              <div className="flex gap-2.5">
+                <button 
+                  onClick={() => setModalType('none')}
+                  className="flex-1 py-2 bg-slate-900 border border-white/5 hover:bg-slate-800 text-slate-300 rounded-xl font-semibold text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={submitImportConfig}
+                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Apply Import</span>
                 </button>
               </div>
             </motion.div>

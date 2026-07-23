@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, AttachmentBuilder } from 'discord.js';
 import { ensureGuildStorage, getGuildSettings, saveGuildSettings, addGuildAudit, DATA_DIR } from '../storage.js';
 import { issueWarning } from '../utils/warnings.js';
 import { statusEmoji, statusEmojiObject } from '../utils/statusEmojis.js';
@@ -66,6 +66,23 @@ function buildCustomDmEmbed(options) {
 /**
  * Helper to display a confirmation embed with Yes/No buttons containing status icons
  */
+function resolveEmojiObject(input, fallbackKey = 'success') {
+  if (input && typeof input === 'object' && (input.id || input.name)) return input;
+  if (typeof input === 'string') {
+    const match = input.match(/<a?:(\w+):(\d+)>/);
+    if (match) {
+      return { id: match[2], name: match[1], animated: input.startsWith('<a:') };
+    }
+    const resolved = statusEmojiObject(input);
+    if (resolved) return resolved;
+    if (/^\d+$/.test(input)) {
+      return { id: input };
+    }
+    return { name: input };
+  }
+  return statusEmojiObject(fallbackKey) || { name: fallbackKey === 'success' ? '✅' : '❌' };
+}
+
 async function handleActionConfirmation({
   interaction,
   actionTitle,
@@ -73,6 +90,11 @@ async function handleActionConfirmation({
   targetUser,
   fields = [],
   color = '#F59E0B',
+  actionType = null,
+  confirmEmoji = null,
+  cancelEmoji = null,
+  confirmLabel = 'Yes',
+  cancelLabel = 'No',
   onConfirm
 }) {
   const confirmEmbed = new EmbedBuilder()
@@ -82,20 +104,26 @@ async function handleActionConfirmation({
     .addFields(fields)
     .setFooter({ text: 'Confirmation required • Expires in 30s' });
 
-  const yesEmoji = statusEmojiObject('success') || { name: '✅' };
-  const noEmoji = statusEmojiObject('error') || { name: '❌' };
+  const yesEmoji = resolveEmojiObject(confirmEmoji || actionType, 'success');
+  const noEmoji = resolveEmojiObject(cancelEmoji, 'error');
 
   const confirmBtn = new ButtonBuilder()
     .setCustomId(`confirm_${interaction.id}`)
-    .setLabel('Yes')
-    .setStyle(ButtonStyle.Danger)
-    .setEmoji(yesEmoji);
+    .setLabel(confirmLabel)
+    .setStyle(ButtonStyle.Danger);
+
+  if (yesEmoji) {
+    confirmBtn.setEmoji(yesEmoji);
+  }
 
   const cancelBtn = new ButtonBuilder()
     .setCustomId(`cancel_${interaction.id}`)
-    .setLabel('No')
-    .setStyle(ButtonStyle.Secondary)
-    .setEmoji(noEmoji);
+    .setLabel(cancelLabel)
+    .setStyle(ButtonStyle.Secondary);
+
+  if (noEmoji) {
+    cancelBtn.setEmoji(noEmoji);
+  }
 
   const row = new ActionRowBuilder().addComponents(confirmBtn, cancelBtn);
   const message = await interaction.editReply({ embeds: [confirmEmbed], components: [row] });
@@ -166,11 +194,13 @@ function getHelpEmbedAndComponents(category = 'home') {
   } else if (category === 'moderation') {
     embed
       .setTitle(`${banIcon} Moderation Commands`)
-      .setDescription('Commands for managing server members and channels:')
+      .setDescription('Commands for managing server members, roles, nicknames, and channels:')
       .addFields(
         { name: `${lockIcon} Channel Controls`, value: '`/lock` • `/unlock` • `/lockall` • `/unlockall` - Lock or unlock text channels for `@everyone`.' },
         { name: `${banIcon} Member Sanctions`, value: '`/ban` • `/tempban` • `/kick` • `/softban` • `/unban` - Sanction misbehaving members.' },
         { name: `${timeoutIcon} Timeouts & Warnings`, value: '`/mute` • `/unmute` • `/warn` • `/clearwarns` - Timeout or warn members.' },
+        { name: `${userIcon} Member & Role Mgmt`, value: '`/nick` • `/role` • `/massrole` • `/strip` - Manage user nicknames and server roles.' },
+        { name: `${commandIcon} Voice Moderation`, value: '`/voicemute` • `/voiceunmute` • `/voicekick` • `/deafen` • `/undeafen` - Moderate voice channels.' },
         { name: `${successIcon} Chat Management`, value: '`/purge` • `/slowmode` - Clean up messages or set channel chat delay.' }
       );
   } else if (category === 'protection') {
@@ -180,13 +210,14 @@ function getHelpEmbedAndComponents(category = 'home') {
       .addFields(
         { name: `${raidIcon} Anti-Raid`, value: '`/antiraid status` • `/antiraid log channel:#channel`' },
         { name: `${nukeIcon} Anti-Nuke`, value: '`/antinuke status` • `/antinuke toggle` • `/antinuke log channel:#channel`' },
-        { name: `${lockIcon} Safeguards & Whitelist`, value: '`/strip` • `/quarantine` • `/decensor` • `/whitelist`' }
+        { name: `${lockIcon} Safeguards & Whitelist`, value: '`/quarantine` • `/decensor` • `/whitelist`' }
       );
   } else if (category === 'dm_utility') {
     embed
       .setTitle(`${userIcon} DM & Utility Commands`)
-      .setDescription('Utility and direct message tools:')
+      .setDescription('Utility, server inspection, and direct message tools:')
       .addFields(
+        { name: `${commandIcon} Server & User Info`, value: '`/userinfo` • `/serverinfo` - Inspect member security profiles and server metrics.' },
         { name: `${userIcon} Direct Message`, value: '`/dm` - Send a direct message to a user.' },
         { name: `${ownerIcon} DM Announcements`, value: '`/dmroll` • `/dmglobal` - Send messages to selected members or the entire server.' },
         { name: `${commandIcon} History & Logs`, value: '`/warnings` • `/modlogs` - View member warnings and moderator activity history.' }
@@ -1117,6 +1148,7 @@ export default async function handleInteraction(interaction) {
         actionTitle: `${banIcon} Confirm Member Ban`,
         actionPrompt: `Are you sure you want to permanently ban **${targetUser.tag}** (\`${targetUser.id}\`) from this server?`,
         targetUser,
+        actionType: 'ban',
         fields: [
           { name: `${userIcon} Target User`, value: `<@${targetUser.id}>`, inline: true },
           { name: `${statusEmoji('info') || '📝'} Reason`, value: `\`${reason}\``, inline: true },
@@ -1159,6 +1191,7 @@ export default async function handleInteraction(interaction) {
         actionTitle: `${banIcon} Confirm Temporary Ban`,
         actionPrompt: `Are you sure you want to temporarily ban **${targetUser.tag}** for \`${duration}\`?`,
         targetUser,
+        actionType: 'ban',
         fields: [
           { name: `${userIcon} Target User`, value: `<@${targetUser.id}>`, inline: true },
           { name: `${statusEmoji('watch') || '🕒'} Duration`, value: `\`${duration}\``, inline: true },
@@ -1200,6 +1233,7 @@ export default async function handleInteraction(interaction) {
         actionTitle: `${banIcon} Confirm Softban`,
         actionPrompt: `Are you sure you want to softban **${targetUser.tag}** (kick and clear 7 days of messages)?`,
         targetUser,
+        actionType: 'ban',
         fields: [
           { name: `${userIcon} Target User`, value: `<@${targetUser.id}>`, inline: true },
           { name: `${statusEmoji('info') || '📝'} Reason`, value: `\`${reason}\``, inline: true }
@@ -1234,22 +1268,32 @@ export default async function handleInteraction(interaction) {
       const userId = interaction.options.getString('user_id');
       const reason = interaction.options.getString('reason') || 'Unbanned by moderator';
       await interaction.deferReply();
-      try {
-        await interaction.guild.members.unban(userId, reason);
-        addGuildAudit(guildId, 'moderation', 'MEMBER_UNBAN', `Unbanned user ID ${userId}: ${reason}`, interaction.user.tag);
-        
-        const embed = new EmbedBuilder()
-          .setTitle(`${unlockIcon} User Unbanned`)
-          .setColor('#10B981')
-          .setDescription(`Successfully unbanned user ID \`${userId}\`.`)
-          .addFields({ name: `${statusEmoji('info') || '📝'} Reason`, value: `\`${reason}\``, inline: true })
-          .setTimestamp();
 
-        return interaction.editReply({ embeds: [embed] });
-      } catch (err) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to unban user: ${err.message}`);
-        return interaction.editReply({ embeds: [embed] });
-      }
+      return handleActionConfirmation({
+        interaction,
+        actionTitle: `${unlockIcon} Confirm User Unban`,
+        actionPrompt: `Are you sure you want to unban user ID **\`${userId}\`**?`,
+        targetUser: null,
+        actionType: 'unlock',
+        fields: [
+          { name: `${userIcon} Target User ID`, value: `\`${userId}\``, inline: true },
+          { name: `${statusEmoji('info') || '📝'} Reason`, value: `\`${reason}\``, inline: true }
+        ],
+        color: '#10B981',
+        onConfirm: async () => {
+          await interaction.guild.members.unban(userId, reason);
+          addGuildAudit(guildId, 'moderation', 'MEMBER_UNBAN', `Unbanned user ID ${userId}: ${reason}`, interaction.user.tag);
+          
+          const embed = new EmbedBuilder()
+            .setTitle(`${unlockIcon} User Unbanned`)
+            .setColor('#10B981')
+            .setDescription(`Successfully unbanned user ID \`${userId}\`.`)
+            .addFields({ name: `${statusEmoji('info') || '📝'} Reason`, value: `\`${reason}\``, inline: true })
+            .setTimestamp();
+
+          await interaction.editReply({ embeds: [embed], components: [] });
+        }
+      });
     }
 
     // 17. Kick command
@@ -1267,6 +1311,7 @@ export default async function handleInteraction(interaction) {
         actionTitle: `${kickIcon} Confirm Member Kick`,
         actionPrompt: `Are you sure you want to kick **${targetUser.tag}** (\`${targetUser.id}\`) from the server?`,
         targetUser,
+        actionType: 'kick',
         fields: [
           { name: `${userIcon} Target User`, value: `<@${targetUser.id}>`, inline: true },
           { name: `${statusEmoji('info') || '📝'} Reason`, value: `\`${reason}\``, inline: true }
@@ -1313,6 +1358,7 @@ export default async function handleInteraction(interaction) {
         actionTitle: `${timeoutIcon} Confirm Timeout / Mute`,
         actionPrompt: `Are you sure you want to timeout **${targetUser.tag}** for \`${durationStr}\`?`,
         targetUser,
+        actionType: 'timeout',
         fields: [
           { name: `${userIcon} Target User`, value: `<@${targetUser.id}>`, inline: true },
           { name: `${statusEmoji('watch') || '🕒'} Duration`, value: `\`${durationStr}\``, inline: true },
@@ -1614,6 +1660,354 @@ export default async function handleInteraction(interaction) {
         saveGuildSettings(guildId, settings);
         
         const embed = new EmbedBuilder().setColor('#10B981').setDescription(`${successIcon} Removed target from Whitelist.`);
+        return interaction.editReply({ embeds: [embed] });
+      }
+    }
+
+    // 27. Nick command
+    if (commandName === 'nick') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageNicknames)) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} **Access Denied**: \`ManageNicknames\` permission required.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+      const targetUser = interaction.options.getUser('user');
+      const nickname = interaction.options.getString('nickname');
+      const reason = interaction.options.getString('reason') || 'Nickname updated by moderator';
+
+      await interaction.deferReply();
+      try {
+        const member = await interaction.guild.members.fetch(targetUser.id);
+        const oldNick = member.nickname || member.user.username;
+        await member.setNickname(nickname || null, reason);
+        addGuildAudit(guildId, 'moderation', 'NICKNAME_CHANGE', `Changed ${targetUser.tag}'s nickname from "${oldNick}" to "${nickname || '[RESET]'}"`, interaction.user.tag);
+
+        const embed = new EmbedBuilder()
+          .setTitle(`${successIcon} Nickname Updated`)
+          .setColor('#3B82F6')
+          .setDescription(`Successfully updated nickname for <@${targetUser.id}>.`)
+          .addFields(
+            { name: `${userIcon} Target Member`, value: `<@${targetUser.id}>`, inline: true },
+            { name: 'Old Name', value: `\`${oldNick}\``, inline: true },
+            { name: 'New Name', value: `\`${nickname || '[Reset to Username]'}\``, inline: true },
+            { name: 'Reason', value: `\`${reason}\``, inline: false }
+          )
+          .setTimestamp();
+
+        return interaction.editReply({ embeds: [embed] });
+      } catch (err) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to update nickname: ${err.message}`);
+        return interaction.editReply({ embeds: [embed] });
+      }
+    }
+
+    // 28. Role command (add / remove)
+    if (commandName === 'role') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} **Access Denied**: \`ManageRoles\` permission required.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      let subcommand = null;
+      try { subcommand = interaction.options.getSubcommand(); } catch (e) {}
+
+      const targetUser = interaction.options.getUser('user');
+      const role = interaction.options.getRole('role');
+      const reason = interaction.options.getString('reason') || 'Role updated by moderator';
+
+      await interaction.deferReply();
+      try {
+        const member = await interaction.guild.members.fetch(targetUser.id);
+        const botMember = interaction.guild.members.me;
+
+        if (role.position >= botMember.roles.highest.position) {
+          const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Cannot manage role <@&${role.id}>: Role is higher or equal to bot's highest role.`);
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (subcommand === 'add') {
+          await member.roles.add(role, reason);
+          addGuildAudit(guildId, 'moderation', 'ROLE_ASSIGNED', `Assigned role ${role.name} to ${targetUser.tag}`, interaction.user.tag);
+
+          const embed = new EmbedBuilder()
+            .setTitle(`${successIcon} Role Assigned`)
+            .setColor('#10B981')
+            .setDescription(`Granted role <@&${role.id}> to <@${targetUser.id}>.`)
+            .addFields(
+              { name: 'Role', value: `<@&${role.id}> (\`${role.id}\`)`, inline: true },
+              { name: 'Target Member', value: `<@${targetUser.id}>`, inline: true },
+              { name: 'Reason', value: `\`${reason}\``, inline: false }
+            )
+            .setTimestamp();
+          return interaction.editReply({ embeds: [embed] });
+        } else {
+          await member.roles.remove(role, reason);
+          addGuildAudit(guildId, 'moderation', 'ROLE_REMOVED', `Removed role ${role.name} from ${targetUser.tag}`, interaction.user.tag);
+
+          const embed = new EmbedBuilder()
+            .setTitle(`${successIcon} Role Removed`)
+            .setColor('#F59E0B')
+            .setDescription(`Revoked role <@&${role.id}> from <@${targetUser.id}>.`)
+            .addFields(
+              { name: 'Role', value: `<@&${role.id}> (\`${role.id}\`)`, inline: true },
+              { name: 'Target Member', value: `<@${targetUser.id}>`, inline: true },
+              { name: 'Reason', value: `\`${reason}\``, inline: false }
+            )
+            .setTimestamp();
+          return interaction.editReply({ embeds: [embed] });
+        }
+      } catch (err) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to modify roles: ${err.message}`);
+        return interaction.editReply({ embeds: [embed] });
+      }
+    }
+
+    // 29. Userinfo command
+    if (commandName === 'userinfo') {
+      const targetUser = interaction.options.getUser('user') || interaction.user;
+      await interaction.deferReply();
+
+      try {
+        const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+        const warningsPath = path.join(DATA_DIR, guildId, 'warnings.json');
+        let warnings = [];
+        try { warnings = JSON.parse(fs.readFileSync(warningsPath, 'utf8')); } catch (e) {}
+
+        const userWarns = warnings.filter(w => w.memberId === targetUser.id && w.active !== false);
+
+        const joinedAtStr = member?.joinedAt ? `<t:${Math.floor(member.joinedAt.getTime() / 1000)}:R>` : 'Unknown';
+        const createdAtStr = `<t:${Math.floor(targetUser.createdAt.getTime() / 1000)}:R>`;
+        const isTimedOut = member?.isCommunicationDisabled?.();
+        const timeoutUntil = isTimedOut ? `<t:${Math.floor(member.communicationDisabledUntil.getTime() / 1000)}:R>` : 'None';
+
+        const rolesList = member?.roles?.cache
+          ?.filter(r => r.name !== '@everyone')
+          ?.sort((a, b) => b.position - a.position)
+          ?.map(r => `<@&${r.id}>`)
+          ?.slice(0, 10)
+          ?.join(', ') || 'None';
+
+        const embed = new EmbedBuilder()
+          .setTitle(`${userIcon} Member Security Profile: ${targetUser.tag}`)
+          .setColor('#5865F2')
+          .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
+          .addFields(
+            { name: 'User Identifier', value: `<@${targetUser.id}>\n\`${targetUser.id}\``, inline: true },
+            { name: 'Bot Account', value: targetUser.bot ? '🤖 Yes' : '👤 No', inline: true },
+            { name: 'Account Created', value: createdAtStr, inline: true },
+            { name: 'Joined Server', value: joinedAtStr, inline: true },
+            { name: 'Active Warnings', value: `\`${userWarns.length}\``, inline: true },
+            { name: 'Timeout Status', value: isTimedOut ? `⏳ Muted until ${timeoutUntil}` : '✅ Active', inline: true },
+            { name: 'Top Role', value: member?.roles?.highest ? `<@&${member.roles.highest.id}>` : 'None', inline: true },
+            { name: 'Roles Overview', value: rolesList, inline: false }
+          )
+          .setTimestamp();
+
+        return interaction.editReply({ embeds: [embed] });
+      } catch (err) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to fetch member info: ${err.message}`);
+        return interaction.editReply({ embeds: [embed] });
+      }
+    }
+
+    // 30. Serverinfo command
+    if (commandName === 'serverinfo') {
+      await interaction.deferReply();
+      try {
+        const { guild } = interaction;
+        await guild.members.fetch().catch(() => {});
+
+        const totalMembers = guild.memberCount;
+        const botCount = guild.members.cache.filter(m => m.user.bot).size;
+        const humanCount = totalMembers - botCount;
+        const owner = await guild.fetchOwner();
+
+        const embed = new EmbedBuilder()
+          .setTitle(`${shieldIcon} Server Security Overview: ${guild.name}`)
+          .setColor('#3B82F6')
+          .setThumbnail(guild.iconURL({ dynamic: true, size: 256 }))
+          .addFields(
+            { name: 'Server Owner', value: `<@${owner.id}> (\`${owner.user.tag}\`)`, inline: true },
+            { name: 'Server ID', value: `\`${guild.id}\``, inline: true },
+            { name: 'Created Date', value: `<t:${Math.floor(guild.createdAt.getTime() / 1000)}:R>`, inline: true },
+            { name: 'Total Members', value: `👥 **${totalMembers}** (Humans: ${humanCount} | Bots: ${botCount})`, inline: true },
+            { name: 'Channels Count', value: `💬 **${guild.channels.cache.size}** total`, inline: true },
+            { name: 'Roles Count', value: `🎭 **${guild.roles.cache.size}** total`, inline: true },
+            { name: 'Verification Level', value: `\`${guild.verificationLevel}\``, inline: true },
+            { name: 'Explicit Content Filter', value: `\`${guild.explicitContentFilter}\``, inline: true },
+            { name: 'Nexus Security Shield', value: `${settings.automod.enabled ? '✅ AutoMod' : '❌ AutoMod'} • ${settings.antiraid.enabled ? '✅ AntiRaid' : '❌ AntiRaid'} • ${settings.antinuke.enabled ? '✅ AntiNuke' : '❌ AntiNuke'}`, inline: false }
+          )
+          .setTimestamp();
+
+        return interaction.editReply({ embeds: [embed] });
+      } catch (err) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to fetch server info: ${err.message}`);
+        return interaction.editReply({ embeds: [embed] });
+      }
+    }
+
+    // 31. Massrole command
+    if (commandName === 'massrole') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} **Access Denied**: \`Administrator\` permission required.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      const action = interaction.options.getString('action');
+      const targetGroup = interaction.options.getString('target');
+      const role = interaction.options.getRole('role');
+      const reason = interaction.options.getString('reason') || 'Mass role execution';
+
+      await interaction.deferReply();
+      try {
+        const members = await interaction.guild.members.fetch();
+        let affectedCount = 0;
+
+        for (const [_, member] of members) {
+          if (targetGroup === 'humans' && member.user.bot) continue;
+          if (targetGroup === 'bots' && !member.user.bot) continue;
+
+          if (action === 'add' && !member.roles.cache.has(role.id)) {
+            await member.roles.add(role, reason).catch(() => {});
+            affectedCount++;
+          } else if (action === 'remove' && member.roles.cache.has(role.id)) {
+            await member.roles.remove(role, reason).catch(() => {});
+            affectedCount++;
+          }
+        }
+
+        addGuildAudit(guildId, 'moderation', 'MASS_ROLE_EXECUTED', `Mass ${action} role ${role.name} to ${affectedCount} members (${targetGroup})`, interaction.user.tag);
+
+        const embed = new EmbedBuilder()
+          .setTitle(`${successIcon} Mass Role Action Complete`)
+          .setColor('#10B981')
+          .setDescription(`Successfully ${action === 'add' ? 'assigned' : 'removed'} role <@&${role.id}> for **${affectedCount}** members.`)
+          .addFields(
+            { name: 'Role', value: `<@&${role.id}>`, inline: true },
+            { name: 'Target Group', value: `\`${targetGroup.toUpperCase()}\``, inline: true },
+            { name: 'Affected Members', value: `\`${affectedCount}\``, inline: true }
+          )
+          .setTimestamp();
+
+        return interaction.editReply({ embeds: [embed] });
+      } catch (err) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Mass role failed: ${err.message}`);
+        return interaction.editReply({ embeds: [embed] });
+      }
+    }
+
+    // 32. Voice moderation commands (voicemute, voiceunmute, voicekick, deafen, undeafen)
+    if (['voicemute', 'voiceunmute', 'voicekick', 'deafen', 'undeafen'].includes(commandName)) {
+      const targetUser = interaction.options.getUser('user');
+      const reason = interaction.options.getString('reason') || 'Voice moderation action';
+
+      await interaction.deferReply();
+      try {
+        const member = await interaction.guild.members.fetch(targetUser.id);
+        if (!member.voice.channel) {
+          const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} User <@${targetUser.id}> is not connected to any voice channel.`);
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (commandName === 'voicemute') {
+          if (!interaction.member.permissions.has(PermissionFlagsBits.MuteMembers)) {
+            const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} **Access Denied**: \`MuteMembers\` permission required.`);
+            return interaction.editReply({ embeds: [embed] });
+          }
+          await member.voice.setMute(true, reason);
+          addGuildAudit(guildId, 'moderation', 'VOICE_MUTE', `Server voice muted ${targetUser.tag}`, interaction.user.tag);
+          const embed = new EmbedBuilder().setTitle(`${successIcon} Voice Muted`).setColor('#F59E0B').setDescription(`Server muted <@${targetUser.id}> in voice.`).addFields({ name: 'Reason', value: `\`${reason}\`` });
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (commandName === 'voiceunmute') {
+          if (!interaction.member.permissions.has(PermissionFlagsBits.MuteMembers)) {
+            const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} **Access Denied**: \`MuteMembers\` permission required.`);
+            return interaction.editReply({ embeds: [embed] });
+          }
+          await member.voice.setMute(false, reason);
+          addGuildAudit(guildId, 'moderation', 'VOICE_UNMUTE', `Server voice unmuted ${targetUser.tag}`, interaction.user.tag);
+          const embed = new EmbedBuilder().setTitle(`${successIcon} Voice Mute Lifted`).setColor('#10B981').setDescription(`Server unmuted <@${targetUser.id}> in voice.`).addFields({ name: 'Reason', value: `\`${reason}\`` });
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (commandName === 'voicekick') {
+          if (!interaction.member.permissions.has(PermissionFlagsBits.MoveMembers)) {
+            const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} **Access Denied**: \`MoveMembers\` permission required.`);
+            return interaction.editReply({ embeds: [embed] });
+          }
+          await member.voice.disconnect(reason);
+          addGuildAudit(guildId, 'moderation', 'VOICE_KICK', `Disconnected ${targetUser.tag} from voice channel`, interaction.user.tag);
+          const embed = new EmbedBuilder().setTitle(`${successIcon} Voice Disconnected`).setColor('#F59E0B').setDescription(`Disconnected <@${targetUser.id}> from voice channel.`).addFields({ name: 'Reason', value: `\`${reason}\`` });
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (commandName === 'deafen') {
+          if (!interaction.member.permissions.has(PermissionFlagsBits.DeafenMembers)) {
+            const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} **Access Denied**: \`DeafenMembers\` permission required.`);
+            return interaction.editReply({ embeds: [embed] });
+          }
+          await member.voice.setDeaf(true, reason);
+          addGuildAudit(guildId, 'moderation', 'VOICE_DEAFEN', `Server deafened ${targetUser.tag}`, interaction.user.tag);
+          const embed = new EmbedBuilder().setTitle(`${successIcon} Member Deafened`).setColor('#F59E0B').setDescription(`Server deafened <@${targetUser.id}> in voice.`).addFields({ name: 'Reason', value: `\`${reason}\`` });
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (commandName === 'undeafen') {
+          if (!interaction.member.permissions.has(PermissionFlagsBits.DeafenMembers)) {
+            const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} **Access Denied**: \`DeafenMembers\` permission required.`);
+            return interaction.editReply({ embeds: [embed] });
+          }
+          await member.voice.setDeaf(false, reason);
+          addGuildAudit(guildId, 'moderation', 'VOICE_UNDEAFEN', `Server undeafened ${targetUser.tag}`, interaction.user.tag);
+          const embed = new EmbedBuilder().setTitle(`${successIcon} Deafen Lifted`).setColor('#10B981').setDescription(`Server undeafened <@${targetUser.id}> in voice.`).addFields({ name: 'Reason', value: `\`${reason}\`` });
+          return interaction.editReply({ embeds: [embed] });
+        }
+      } catch (err) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Voice moderation action failed: ${err.message}`);
+        return interaction.editReply({ embeds: [embed] });
+      }
+    }
+
+    // 33. Extract Embed command
+    if (commandName === 'extractembed') {
+      await interaction.deferReply();
+      const messageId = interaction.options.getString('message_id');
+      let targetMessage = null;
+
+      try {
+        if (messageId) {
+          targetMessage = await interaction.channel.messages.fetch(messageId).catch(() => null);
+        } else {
+          const recent = await interaction.channel.messages.fetch({ limit: 10 });
+          targetMessage = recent.find(m => m.embeds && m.embeds.length > 0);
+        }
+
+        if (!targetMessage) {
+          const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} No message with embeds found. Specify a valid message ID or run this command in a channel with embeds.`);
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (!targetMessage.embeds || targetMessage.embeds.length === 0) {
+          const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} No embeds found in the targeted message (\`${targetMessage.id}\`).`);
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        const rawEmbeds = targetMessage.embeds.map(e => e.data || (e.toJSON ? e.toJSON() : e));
+        const jsonContent = JSON.stringify(rawEmbeds.length === 1 ? rawEmbeds[0] : rawEmbeds, null, 2);
+
+        if (jsonContent.length <= 1900) {
+          return interaction.editReply({
+            content: `📦 **Extracted Embed JSON** (from message \`${targetMessage.id}\`):\n\`\`\`json\n${jsonContent}\n\`\`\``
+          });
+        } else {
+          const attachment = new AttachmentBuilder(Buffer.from(jsonContent, 'utf-8'), { name: 'embed.json' });
+          return interaction.editReply({
+            content: `📦 **Extracted Embed JSON** (Exceeds character limit, attached file for message \`${targetMessage.id}\`):`,
+            files: [attachment]
+          });
+        }
+      } catch (err) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to extract embed: ${err.message}`);
         return interaction.editReply({ embeds: [embed] });
       }
     }

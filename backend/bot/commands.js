@@ -691,5 +691,242 @@ export const commands = [
         type: 1 // SUB_COMMAND
       }
     ]
+  },
+  {
+    name: 'nick',
+    description: 'Changes or resets the nickname of a server member.',
+    options: [
+      {
+        name: 'user',
+        description: 'The target user',
+        type: 6, // USER
+        required: true
+      },
+      {
+        name: 'nickname',
+        description: 'New nickname (leave blank to reset)',
+        type: 3, // STRING
+        required: false
+      },
+      {
+        name: 'reason',
+        description: 'Reason for changing nickname',
+        type: 3, // STRING
+        required: false
+      }
+    ]
+  },
+  {
+    name: 'role',
+    description: 'Grants or revokes a role from a target member.',
+    options: [
+      {
+        name: 'add',
+        description: 'Add a role to a member',
+        type: 1, // SUB_COMMAND
+        options: [
+          {
+            name: 'user',
+            description: 'The user to give the role to',
+            type: 6, // USER
+            required: true
+          },
+          {
+            name: 'role',
+            description: 'The role to assign',
+            type: 8, // ROLE
+            required: true
+          },
+          {
+            name: 'reason',
+            description: 'Reason for assigning the role',
+            type: 3, // STRING
+            required: false
+          }
+        ]
+      },
+      {
+        name: 'remove',
+        description: 'Remove a role from a member',
+        type: 1, // SUB_COMMAND
+        options: [
+          {
+            name: 'user',
+            description: 'The user to remove the role from',
+            type: 6, // USER
+            required: true
+          },
+          {
+            name: 'role',
+            description: 'The role to remove',
+            type: 8, // ROLE
+            required: true
+          },
+          {
+            name: 'reason',
+            description: 'Reason for removing the role',
+            type: 3, // STRING
+            required: false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    name: 'userinfo',
+    description: 'Inspects a user moderation profile, roles, joined date, and security record.',
+    options: [
+      {
+        name: 'user',
+        description: 'Target member to inspect (defaults to self)',
+        type: 6, // USER
+        required: false
+      }
+    ]
+  },
+  {
+    name: 'serverinfo',
+    description: 'Displays server security overview, member metrics, and verification status.'
+  },
+  {
+    name: 'massrole',
+    description: 'Bulk assigns or removes a role for all humans or all bots.',
+    options: [
+      {
+        name: 'action',
+        description: 'Add or remove role',
+        type: 3, // STRING
+        required: true,
+        choices: [
+          { name: 'Add Role', value: 'add' },
+          { name: 'Remove Role', value: 'remove' }
+        ]
+      },
+      {
+        name: 'target',
+        description: 'Target group',
+        type: 3, // STRING
+        required: true,
+        choices: [
+          { name: 'Humans Only', value: 'humans' },
+          { name: 'Bots Only', value: 'bots' },
+          { name: 'All Members', value: 'all' }
+        ]
+      },
+      {
+        name: 'role',
+        description: 'The role to assign or remove',
+        type: 8, // ROLE
+        required: true
+      },
+      {
+        name: 'reason',
+        description: 'Reason for mass role adjustment',
+        type: 3, // STRING
+        required: false
+      }
+    ]
+  },
+  {
+    name: 'voicemute',
+    description: 'Server mutes a member in voice channels.',
+    options: [
+      {
+        name: 'user',
+        description: 'The user to voice mute',
+        type: 6, // USER
+        required: true
+      },
+      {
+        name: 'reason',
+        description: 'Reason for voice mute',
+        type: 3, // STRING
+        required: false
+      }
+    ]
+  },
+  {
+    name: 'voiceunmute',
+    description: 'Server unmutes a member in voice channels.',
+    options: [
+      {
+        name: 'user',
+        description: 'The user to voice unmute',
+        type: 6, // USER
+        required: true
+      },
+      {
+        name: 'reason',
+        description: 'Reason for lifting voice mute',
+        type: 3, // STRING
+        required: false
+      }
+    ]
+  },
+  {
+    name: 'voicekick',
+    description: 'Disconnects a user from their active voice channel.',
+    options: [
+      {
+        name: 'user',
+        description: 'The user to disconnect',
+        type: 6, // USER
+        required: true
+      },
+      {
+        name: 'reason',
+        description: 'Reason for voice kick',
+        type: 3, // STRING
+        required: false
+      }
+    ]
+  },
+  {
+    name: 'deafen',
+    description: 'Server deafens a member in voice channels.',
+    options: [
+      {
+        name: 'user',
+        description: 'The user to deafen',
+        type: 6, // USER
+        required: true
+      },
+      {
+        name: 'reason',
+        description: 'Reason for deafening',
+        type: 3, // STRING
+        required: false
+      }
+    ]
+  },
+  {
+    name: 'undeafen',
+    description: 'Server undeafens a member in voice channels.',
+    options: [
+      {
+        name: 'user',
+        description: 'The user to undeafen',
+        type: 6, // USER
+        required: true
+      },
+      {
+        name: 'reason',
+        description: 'Reason for undeafening',
+        type: 3, // STRING
+        required: false
+      }
+    ]
+  },
+  {
+    name: 'extractembed',
+    description: 'Extracts embeds from a replied message or target message ID into raw JSON.',
+    options: [
+      {
+        name: 'message_id',
+        description: 'Optional ID of the message containing embeds to extract',
+        type: 3, // STRING
+        required: false
+      }
+    ]
   }
 ];
