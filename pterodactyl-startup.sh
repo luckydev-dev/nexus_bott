@@ -70,17 +70,24 @@ if [ ! -f "package.json" ]; then
     fi
 fi
 
-# 4. Install Node dependencies (only if node_modules is missing)
+# 4. Install / Verify Node dependencies
 if [ ! -d "node_modules" ]; then
     echo "[Node] node_modules not found. Installing npm dependencies..."
     npm install --no-audit --no-fund
 else
-    echo "[Node] node_modules already exists. Skipping npm install."
+    echo "[Node] node_modules found. Ensuring native bindings are rebuilt..."
+    npm rebuild || true
 fi
 
-# 5. Build frontend web dashboard
+# 5. Build frontend web dashboard with auto-healing recovery
 echo "[Build] Building web dashboard..."
-npm run build || echo "[Build Warning] Frontend build skipped or encountered issue, continuing startup..."
+if ! npm run build || [ ! -f "dist/index.html" ]; then
+    echo "[Build Warning] Initial build failed or dist/index.html missing. Re-installing dependencies..."
+    rm -rf node_modules package-lock.json
+    npm install --no-audit --no-fund
+    echo "[Build] Retrying web dashboard build..."
+    npm run build || echo "[Build Warning] Frontend build encountered an issue, continuing startup..."
+fi
 
 # 6. Start NexusBot
 echo "[Server] Launching NexusBot..."
