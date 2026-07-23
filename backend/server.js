@@ -555,19 +555,23 @@ async function startServer() {
       res.status(500).json({ success: false, error: err.message });
     }
   });
-  if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa"
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
+  const distPath = path.join(process.cwd(), "dist");
+  if (process.env.NODE_ENV === "production" || fs.existsSync(path.join(distPath, "index.html"))) {
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
+  } else {
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa"
+      });
+      app.use(vite.middlewares);
+    } catch (viteErr) {
+      console.warn("[Vite Middleware Warning] Could not load Vite dev server middleware:", viteErr.message);
+    }
   }
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[NexusBot Server] Running at http://localhost:${PORT}`);

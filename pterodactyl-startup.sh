@@ -10,7 +10,7 @@
 
 # ⬇️ SET YOUR GITHUB REPOSITORY URL HERE ⬇️
 # Example: GITHUB_REPO_URL="https://github.com/your-username/your-repo.git"
-GITHUB_REPO_URL=""
+GITHUB_REPO_URL="https://github.com/luckydev-dev/nexus_bott.git"
 
 echo "=========================================="
 echo "   NexusBot Zero-Console GitHub Sync     "
@@ -37,18 +37,37 @@ fi
 # 3. Pull latest changes from GitHub automatically
 if git remote | grep -q "origin"; then
     echo "[Git] Pulling latest code updates from GitHub..."
-    git fetch --all --tags
-    BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
-    if [ "$BRANCH" = "HEAD" ] || [ -z "$BRANCH" ]; then
-        BRANCH="main"
+    git fetch origin --tags || git fetch --all || true
+
+    # Detect active remote branch (main or master)
+    TARGET_BRANCH=""
+    if git rev-parse --verify origin/main >/dev/null 2>&1; then
+        TARGET_BRANCH="main"
+    elif git rev-parse --verify origin/master >/dev/null 2>&1; then
+        TARGET_BRANCH="master"
     fi
-    git checkout -B $BRANCH 2>/dev/null || true
-    git reset --hard origin/$BRANCH 2>/dev/null || git reset --hard origin/master 2>/dev/null || true
-    git pull origin $BRANCH --rebase || true
-    echo "[Git] ✅ Repository successfully updated from GitHub!"
+
+    if [ -n "$TARGET_BRANCH" ]; then
+        echo "[Git] Checking out remote branch '$TARGET_BRANCH'..."
+        git checkout -f -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH" || true
+        git reset --hard "origin/$TARGET_BRANCH" || true
+        git pull origin "$TARGET_BRANCH" --rebase || git pull origin "$TARGET_BRANCH" || true
+        echo "[Git] ✅ Repository successfully updated from GitHub ($TARGET_BRANCH)!"
+    else
+        echo "[Git] ⚠️ Notice: Neither origin/main nor origin/master was found on remote."
+    fi
 else
     echo "[Git] ⚠️ Notice: GITHUB_REPO_URL is empty in pterodactyl-startup.sh."
     echo "[Git] Set GITHUB_REPO_URL=\"https://github.com/...\" at top of pterodactyl-startup.sh to auto-sync!"
+fi
+
+# Verification check for package.json
+if [ ! -f "package.json" ]; then
+    echo "[ERROR] package.json not found in working directory!"
+    if [ -f "backend/package.json" ]; then
+        echo "[Recovery] Found backend/package.json, copying to root..."
+        cp backend/package.json ./package.json
+    fi
 fi
 
 # 4. Install Node dependencies
@@ -57,8 +76,9 @@ npm install --no-audit --no-fund
 
 # 5. Build frontend web dashboard
 echo "[Build] Building web dashboard..."
-npm run build
+npm run build || echo "[Build Warning] Frontend build skipped or encountered issue, continuing startup..."
 
 # 6. Start NexusBot
 echo "[Server] Launching NexusBot..."
+export NODE_ENV=production
 exec npm start
