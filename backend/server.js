@@ -555,8 +555,8 @@ async function startServer() {
       res.status(500).json({ success: false, error: err.message });
     }
   });
-  const distPath = path.join(process.cwd(), "dist");
-  if (process.env.NODE_ENV === "production" || fs.existsSync(path.join(distPath, "index.html"))) {
+  if (process.env.NODE_ENV === "production") {
+    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
@@ -571,6 +571,13 @@ async function startServer() {
       app.use(vite.middlewares);
     } catch (viteErr) {
       console.warn("[Vite Middleware Warning] Could not load Vite dev server middleware:", viteErr.message);
+      const distPath = path.join(process.cwd(), "dist");
+      if (fs.existsSync(path.join(distPath, "index.html"))) {
+        app.use(express.static(distPath));
+        app.get("*", (req, res) => {
+          res.sendFile(path.join(distPath, "index.html"));
+        });
+      }
     }
   }
   app.listen(PORT, "0.0.0.0", () => {

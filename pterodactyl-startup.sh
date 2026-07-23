@@ -70,9 +70,13 @@ if [ ! -f "package.json" ]; then
     fi
 fi
 
-# 4. Install Node dependencies
-echo "[Node] Installing npm dependencies..."
-npm install --no-audit --no-fund
+# 4. Install Node dependencies (only if node_modules is missing)
+if [ ! -d "node_modules" ]; then
+    echo "[Node] node_modules not found. Installing npm dependencies..."
+    npm install --no-audit --no-fund
+else
+    echo "[Node] node_modules already exists. Skipping npm install."
+fi
 
 # 5. Build frontend web dashboard
 echo "[Build] Building web dashboard..."
@@ -81,4 +85,14 @@ npm run build || echo "[Build Warning] Frontend build skipped or encountered iss
 # 6. Start NexusBot
 echo "[Server] Launching NexusBot..."
 export NODE_ENV=production
-exec npm start
+
+if [ -f "server.js" ]; then
+    echo "[Server] Launching root server.js entrypoint..."
+    exec node server.js
+elif [ -f "backend/server.js" ]; then
+    echo "[Server] Launching backend/server.js entrypoint..."
+    exec node backend/server.js
+else
+    echo "[Server] Launching default npm start..."
+    exec npm start
+fi
