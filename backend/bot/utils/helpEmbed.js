@@ -320,12 +320,12 @@ export function getHelpEmbedAndComponents(category = 'home', context = {}, isDis
   // Button row matching requested style: ⏪ ◀️ ❌ ▶️ ⏩
   const btnRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`help_page_${firstCategory}`)
+      .setCustomId(`help_page_first_${firstCategory}`)
       .setEmoji('⏪')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(isDisabled),
     new ButtonBuilder()
-      .setCustomId(`help_page_${prevCategory}`)
+      .setCustomId(`help_page_prev_${prevCategory}`)
       .setEmoji('◀️')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(isDisabled),
@@ -335,12 +335,12 @@ export function getHelpEmbedAndComponents(category = 'home', context = {}, isDis
       .setStyle(ButtonStyle.Danger)
       .setDisabled(isDisabled),
     new ButtonBuilder()
-      .setCustomId(`help_page_${nextCategory}`)
+      .setCustomId(`help_page_next_${nextCategory}`)
       .setEmoji('▶️')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(isDisabled),
     new ButtonBuilder()
-      .setCustomId(`help_page_${lastCategory}`)
+      .setCustomId(`help_page_last_${lastCategory}`)
       .setEmoji('⏩')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(isDisabled)

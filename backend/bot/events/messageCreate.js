@@ -80,13 +80,11 @@ async function handlePrefixCommand(message, settings) {
       new ButtonBuilder()
         .setLabel('Invite')
         .setURL(inviteUrl)
-        .setStyle(ButtonStyle.Link)
-        .setEmoji('↗'),
+        .setStyle(ButtonStyle.Link),
       new ButtonBuilder()
         .setLabel('Web')
         .setURL(webUrl)
         .setStyle(ButtonStyle.Link)
-        .setEmoji('↗')
     );
 
     const row2 = new ActionRowBuilder().addComponents(
@@ -94,7 +92,6 @@ async function handlePrefixCommand(message, settings) {
         .setLabel('Support')
         .setURL(supportUrl)
         .setStyle(ButtonStyle.Link)
-        .setEmoji('↗')
     );
 
     await message.reply({ embeds: [embed], components: [row1, row2] });

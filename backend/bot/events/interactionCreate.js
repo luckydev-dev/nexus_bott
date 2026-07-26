@@ -1972,7 +1972,12 @@ export default async function handleInteraction(interaction) {
         return;
       }
 
-      const selectedCategory = customId.replace('help_page_', '');
+      const selectedCategory = customId
+        .replace('help_page_first_', '')
+        .replace('help_page_prev_', '')
+        .replace('help_page_next_', '')
+        .replace('help_page_last_', '')
+        .replace('help_page_', '');
       const { embeds, components } = getHelpEmbedAndComponents(selectedCategory, context);
       await interaction.update({ embeds, components });
       setHelpTimeout(interaction, selectedCategory, context);
