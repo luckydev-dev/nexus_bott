@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { EmbedBuilder, PermissionFlagsBits, AttachmentBuilder } from 'discord.js';
+import { EmbedBuilder, PermissionFlagsBits, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import fs from 'fs';
 import path from 'path';
 import { getGuildSettings, addGuildAudit, DATA_DIR } from '../storage.js';
@@ -11,6 +11,8 @@ import { getEmoji } from '../utils/emojis.js';
 import { statusEmoji } from '../utils/statusEmojis.js';
 import { logAutoModViolation, logWarnLimitReached } from '../utils/logger.js';
 import { issueWarning } from '../utils/warnings.js';
+
+import { getHelpEmbedAndComponents, setHelpTimeout } from '../utils/helpEmbed.js';
 
 // In-memory message tracker for Anti-Spam
 const messageTimestamps = new Map();
@@ -53,6 +55,52 @@ function parseDuration(durationStr) {
 
 async function handlePrefixCommand(message, settings) {
   const prefix = settings?.prefix || '!';
+
+  // Check if message is a mention of the bot
+  const botMentionRegex = new RegExp(`^<@!?${message.client.user.id}>$`);
+  if (botMentionRegex.test(message.content.trim())) {
+    const clientId = message.client.user?.id || process.env.DISCORD_CLIENT_ID || '1528216029816426608';
+    const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=2113268958&scope=bot`;
+    const supportUrl = 'https://discord.gg/8hbsvybVGs';
+    const webUrl = 'https://nexusbot.dev';
+
+    const embed = new EmbedBuilder()
+      .setTitle(message.guild.name)
+      .setColor('#2F3136')
+      .setThumbnail(message.guild.iconURL({ dynamic: true }) || message.client.user.displayAvatarURL({ dynamic: true }))
+      .setDescription(
+        `Hey <@${message.author.id}>,\n` +
+        `Prefix for this server is **${prefix}**.\n` +
+        `Server ID:\n` +
+        `\`${message.guild.id}\` \n\n` +
+        `Type \`${prefix}help\` for more information`
+      );
+
+    const row1 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('Invite')
+        .setURL(inviteUrl)
+        .setStyle(ButtonStyle.Link)
+        .setEmoji('↗'),
+      new ButtonBuilder()
+        .setLabel('Web')
+        .setURL(webUrl)
+        .setStyle(ButtonStyle.Link)
+        .setEmoji('↗')
+    );
+
+    const row2 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('Support')
+        .setURL(supportUrl)
+        .setStyle(ButtonStyle.Link)
+        .setEmoji('↗')
+    );
+
+    await message.reply({ embeds: [embed], components: [row1, row2] });
+    return true;
+  }
+
   if (!message.content.startsWith(prefix)) return false;
 
   const args = message.content.slice(prefix.length).trim().split(/ +/);
@@ -991,20 +1039,17 @@ async function handlePrefixCommand(message, settings) {
 
   // Command 31: help
   if (['help', 'cmds', 'commands'].includes(command)) {
-    const embed = new EmbedBuilder()
-      .setTitle(`${shieldIcon} Nexus Security Command Matrix`)
-      .setColor('#3B82F6')
-      .setDescription(`All available server moderation commands support both prefix (\`${prefix}command\`) and slash (\`/command\`) execution:`)
-      .addFields(
-        { name: `🛡️ Moderation`, value: `\`${prefix}ban\` • \`${prefix}tempban\` • \`${prefix}softban\` • \`${prefix}unban\` • \`${prefix}kick\` • \`${prefix}timeout\` • \`${prefix}untimeout\` • \`${prefix}warn\` • \`${prefix}warnings\` • \`${prefix}modlogs\`` },
-        { name: `🔒 Channel & Guild Lock`, value: `\`${prefix}lock\` • \`${prefix}unlock\` • \`${prefix}lockall\` • \`${prefix}unlockall\` • \`${prefix}purge\` • \`${prefix}slowmode\`` },
-        { name: `👤 Member & Roles`, value: `\`${prefix}nick\` • \`${prefix}role\` • \`${prefix}massrole\` • \`${prefix}strip\` • \`${prefix}quarantine\` • \`${prefix}userinfo\` • \`${prefix}serverinfo\`` },
-        { name: `🎙️ Voice Controls`, value: `\`${prefix}voicemute\` • \`${prefix}voiceunmute\` • \`${prefix}voicekick\` • \`${prefix}deafen\` • \`${prefix}undeafen\`` },
-        { name: `📦 Embed Extractor`, value: `\`${prefix}extractembed\` (Reply to an embed message to extract raw JSON)` }
-      )
-      .setFooter({ text: `Prefix: ${prefix} | Type ${prefix}help anytime` })
-      .setTimestamp();
-    await message.reply({ embeds: [embed] });
+    const query = args[0] || null;
+    const context = {
+      client: message.client,
+      guild,
+      user: author,
+      prefix,
+      commandQuery: query
+    };
+    const { embeds, components } = getHelpEmbedAndComponents('home', context);
+    const sentMsg = await message.reply({ embeds, components });
+    setHelpTimeout(sentMsg, 'home', context);
     return true;
   }
 

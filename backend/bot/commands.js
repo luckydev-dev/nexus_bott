@@ -10,7 +10,15 @@ export const commands = [
   },
   {
     name: 'help',
-    description: 'Displays the security modules help guide.'
+    description: 'Displays the security modules help guide.',
+    options: [
+      {
+        name: 'command',
+        description: 'Specific command or module to query (e.g. mute, ban, automod)',
+        type: 3, // STRING
+        required: false
+      }
+    ]
   },
   {
     name: 'lock',

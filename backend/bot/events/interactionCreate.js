@@ -9,6 +9,7 @@ import { issueWarning } from '../utils/warnings.js';
 import { statusEmoji, statusEmojiObject } from '../utils/statusEmojis.js';
 import { getEmoji, Emojis } from '../utils/emojis.js';
 import { CUSTOM_EMOJIS, getCustomEmoji } from '../utils/customEmojis.js';
+import { getHelpEmbedAndComponents, setHelpTimeout, clearHelpTimeout } from '../utils/helpEmbed.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -165,100 +166,6 @@ async function handleActionConfirmation({
   });
 }
 
-function getHelpEmbedAndComponents(category = 'home') {
-  const shieldIcon = statusEmoji('shield') || getEmoji('nexus_shield');
-  const automodIcon = statusEmoji('automod') || getEmoji('nexus_automod');
-  const raidIcon = statusEmoji('raid') || getEmoji('nexus_raid');
-  const nukeIcon = statusEmoji('nuke') || getEmoji('nexus_nuke');
-  const lockIcon = statusEmoji('lock') || getEmoji('nexus_lock');
-  const banIcon = statusEmoji('ban') || getEmoji('nexus_ban');
-  const timeoutIcon = statusEmoji('timeout') || getEmoji('nexus_timeout');
-  const commandIcon = statusEmoji('command') || getEmoji('nexus_command');
-  const successIcon = statusEmoji('success') || getEmoji('nexus_checkmark');
-  const userIcon = statusEmoji('user') || getEmoji('nexus_user');
-  const ownerIcon = statusEmoji('owner') || getEmoji('nexus_owner');
-
-  const embed = new EmbedBuilder()
-    .setColor('#5865F2');
-
-  if (category === 'home') {
-    embed
-      .setTitle(`${shieldIcon} NexusBot Help & Overview`)
-      .setDescription('Welcome to NexusBot! Choose a category below to browse commands and settings.');
-    
-    embed.addFields(
-      { name: `${automodIcon} AutoMod`, value: 'Filters spam, invite links, bad words, and excessive caps/emojis automatically.' },
-      { name: `${raidIcon} Anti-Raid`, value: 'Detects rapid member joins and locks down the server or quarantines suspicious accounts.' },
-      { name: `${nukeIcon} Anti-Nuke`, value: 'Prevents unauthorized channel deletions, mass kicks, mass bans, and rogue bot invites.' }
-    );
-  } else if (category === 'moderation') {
-    embed
-      .setTitle(`${banIcon} Moderation Commands`)
-      .setDescription('Commands for managing server members, roles, nicknames, and channels:')
-      .addFields(
-        { name: `${lockIcon} Channel Controls`, value: '`/lock` • `/unlock` • `/lockall` • `/unlockall` - Lock or unlock text channels for `@everyone`.' },
-        { name: `${banIcon} Member Sanctions`, value: '`/ban` • `/tempban` • `/kick` • `/softban` • `/unban` - Sanction misbehaving members.' },
-        { name: `${timeoutIcon} Timeouts & Warnings`, value: '`/mute` • `/unmute` • `/warn` • `/clearwarns` - Timeout or warn members.' },
-        { name: `${userIcon} Member & Role Mgmt`, value: '`/nick` • `/role` • `/massrole` • `/strip` - Manage user nicknames and server roles.' },
-        { name: `${commandIcon} Voice Moderation`, value: '`/voicemute` • `/voiceunmute` • `/voicekick` • `/deafen` • `/undeafen` - Moderate voice channels.' },
-        { name: `${successIcon} Chat Management`, value: '`/purge` • `/slowmode` - Clean up messages or set channel chat delay.' }
-      );
-  } else if (category === 'protection') {
-    embed
-      .setTitle(`${shieldIcon} Server Protection`)
-      .setDescription('Configure automated defenses and view module status:')
-      .addFields(
-        { name: `${raidIcon} Anti-Raid`, value: '`/antiraid status` • `/antiraid log channel:#channel`' },
-        { name: `${nukeIcon} Anti-Nuke`, value: '`/antinuke status` • `/antinuke toggle` • `/antinuke log channel:#channel`' },
-        { name: `${lockIcon} Safeguards & Whitelist`, value: '`/quarantine` • `/decensor` • `/whitelist`' }
-      );
-  } else if (category === 'dm_utility') {
-    embed
-      .setTitle(`${userIcon} DM & Utility Commands`)
-      .setDescription('Utility, server inspection, and direct message tools:')
-      .addFields(
-        { name: `${commandIcon} Server & User Info`, value: '`/userinfo` • `/serverinfo` - Inspect member security profiles and server metrics.' },
-        { name: `${userIcon} Direct Message`, value: '`/dm` - Send a direct message to a user.' },
-        { name: `${ownerIcon} DM Announcements`, value: '`/dmroll` • `/dmglobal` - Send messages to selected members or the entire server.' },
-        { name: `${commandIcon} History & Logs`, value: '`/warnings` • `/modlogs` - View member warnings and moderator activity history.' }
-      );
-  }
-
-  const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId('help_category_select')
-    .setPlaceholder('Select a category...')
-    .addOptions(
-      {
-        label: 'Main Overview',
-        description: 'General info and security features.',
-        value: 'home',
-        emoji: statusEmojiObject('settings') || { name: '⚙️' }
-      },
-      {
-        label: 'Moderation',
-        description: 'Ban, kick, mute, lock, and purge commands.',
-        value: 'moderation',
-        emoji: statusEmojiObject('ban') || { name: '🛡️' }
-      },
-      {
-        label: 'Protection (Raid & Nuke)',
-        description: 'Anti-Raid, Anti-Nuke, and whitelist settings.',
-        value: 'protection',
-        emoji: statusEmojiObject('shield') || { name: '⚔️' }
-      },
-      {
-        label: 'DM & Utilities',
-        description: 'Direct message tools, announcements, and logs.',
-        value: 'dm_utility',
-        emoji: statusEmojiObject('user') || { name: '📬' }
-      }
-    );
-
-  const row = new ActionRowBuilder().addComponents(selectMenu);
-
-  return { embeds: [embed], components: [row] };
-}
-
 export default async function handleInteraction(interaction) {
   const { client } = interaction;
 
@@ -301,8 +208,18 @@ export default async function handleInteraction(interaction) {
 
     // 1. Help Command
     if (commandName === 'help') {
-      const { embeds, components } = getHelpEmbedAndComponents('home');
-      return interaction.reply({ embeds, components });
+      const query = interaction.options.getString('command') || interaction.options.getString('module');
+      const context = {
+        client,
+        guild: interaction.guild,
+        user: interaction.user,
+        prefix: settings.prefix || '!',
+        commandQuery: query
+      };
+      const { embeds, components } = getHelpEmbedAndComponents('home', context);
+      const replyMsg = await interaction.reply({ embeds, components, fetchReply: true });
+      if (replyMsg) setHelpTimeout(replyMsg, 'home', context);
+      return;
     }
 
     // 1.2 Extract Command
@@ -2021,8 +1938,45 @@ export default async function handleInteraction(interaction) {
     const { customId, values } = interaction;
     if (customId === 'help_category_select') {
       const selectedCategory = values[0];
-      const { embeds, components } = getHelpEmbedAndComponents(selectedCategory);
-      return interaction.update({ embeds, components });
+      const settings = interaction.guildId ? getGuildSettings(interaction.guildId) : {};
+      const context = {
+        client,
+        guild: interaction.guild,
+        user: interaction.user,
+        prefix: settings.prefix || '!'
+      };
+      const { embeds, components } = getHelpEmbedAndComponents(selectedCategory, context);
+      await interaction.update({ embeds, components });
+      setHelpTimeout(interaction, selectedCategory, context);
+      return;
+    }
+  } else if (interaction.isButton()) {
+    const { customId } = interaction;
+    if (customId.startsWith('help_page_')) {
+      const settings = interaction.guildId ? getGuildSettings(interaction.guildId) : {};
+      const context = {
+        client,
+        guild: interaction.guild,
+        user: interaction.user,
+        prefix: settings.prefix || '!'
+      };
+
+      if (customId === 'help_page_close') {
+        clearHelpTimeout(interaction.message?.id);
+        try {
+          await interaction.message.delete();
+        } catch (e) {
+          const disabled = getHelpEmbedAndComponents('home', context, true);
+          await interaction.update({ embeds: disabled.embeds, components: disabled.components });
+        }
+        return;
+      }
+
+      const selectedCategory = customId.replace('help_page_', '');
+      const { embeds, components } = getHelpEmbedAndComponents(selectedCategory, context);
+      await interaction.update({ embeds, components });
+      setHelpTimeout(interaction, selectedCategory, context);
+      return;
     }
   }
 }
