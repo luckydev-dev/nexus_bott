@@ -1876,8 +1876,8 @@ export default async function handleInteraction(interaction) {
       deleteDmSession(sessionId);
       const cancelEmbed = new EmbedBuilder()
         .setColor('#EF4444')
-        .setTitle(`${getCustomEmoji('nexus_error') || '❌'} Dispatch Cancelled`)
-        .setDescription('The direct message dispatch setup was cancelled.');
+        .setTitle(`${getCustomEmoji('nexus_cross') || '❌'} Cancelled`)
+        .setDescription('Direct message prompt cancelled.');
       return interaction.update({ embeds: [cancelEmbed], components: [] });
     }
 
@@ -1885,7 +1885,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('dm_btn_send_embed_', '');
       const session = getDmSession(sessionId);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} DM session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
         return interaction.update({ embeds: [embed], components: [] });
       }
 
@@ -1905,15 +1905,14 @@ export default async function handleInteraction(interaction) {
           addGuildAudit(guildId, 'direct-messages', 'DM_COMMAND_SEND', `Sent DM embed to ${targetUser.tag}`, interaction.user.tag);
 
           const successEmbed = new EmbedBuilder()
-            .setTitle(`${getCustomEmoji('nexus_success') || statusEmoji('success') || '✅'} Direct Message Delivered`)
+            .setTitle(`${getCustomEmoji('nexus_tick') || '✅'} Direct Message Delivered`)
             .setColor('#10B981')
-            .setDescription(`Your custom embed message was successfully delivered to <@${targetUser.id}>.`)
+            .setDescription(`Your message was successfully delivered to <@${targetUser.id}>.`)
             .addFields(
               { name: `${getCustomEmoji('nexus_user') || '👤'} Recipient`, value: `**${targetUser.tag || targetUser.username}** (\`${targetUser.id}\`)`, inline: true },
               { name: `${getCustomEmoji('nexus_info') || '✉️'} Format`, value: '`Custom Embed`', inline: true },
               { name: `${getCustomEmoji('nexus_date') || '🕒'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
-            )
-            .setFooter({ text: 'NexusBot • Direct Message' });
+            );
 
           deleteDmSession(sessionId);
           return interaction.editReply({ embeds: [successEmbed], components: [] });
@@ -1939,15 +1938,14 @@ export default async function handleInteraction(interaction) {
           addGuildAudit(guildId, 'direct-messages', 'DMGLOBAL_COMMAND_SEND', `Sent global DM embed to ${successCount} members (Failed: ${failCount})`, interaction.user.tag);
 
           const successEmbed = new EmbedBuilder()
-            .setTitle(`${getCustomEmoji('nexus_success') || statusEmoji('success') || '📢'} DM Broadcast Completed`)
+            .setTitle(`${getCustomEmoji('nexus_tick') || '📢'} DM Broadcast Completed`)
             .setColor('#10B981')
-            .setDescription(`Global embed DM broadcast execution completed for **${interaction.guild.name}**.`)
+            .setDescription(`Global DM broadcast completed for **${interaction.guild.name}**.`)
             .addFields(
-              { name: `${getCustomEmoji('nexus_success') || '✅'} Successful Deliveries`, value: `\`${successCount}\` members`, inline: true },
-              { name: `${getCustomEmoji('nexus_error') || '❌'} Failed Deliveries`, value: `\`${failCount}\` members`, inline: true },
-              { name: `${getCustomEmoji('nexus_settings') || '🎯'} Targeted Filter`, value: targetRole ? `<@&${targetRole.id}>` : '`Entire Server`', inline: true }
-            )
-            .setFooter({ text: 'NexusBot • Global Broadcast' });
+              { name: `${getCustomEmoji('nexus_tick') || '✅'} Successful Deliveries`, value: `\`${successCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_cross') || '❌'} Failed Deliveries`, value: `\`${failCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_settings') || '🎯'} Target Role`, value: targetRole ? `<@&${targetRole.id}>` : '`Entire Server`', inline: true }
+            );
 
           deleteDmSession(sessionId);
           return interaction.editReply({ embeds: [successEmbed], components: [] });
@@ -1955,7 +1953,7 @@ export default async function handleInteraction(interaction) {
       } catch (err) {
         console.error('[DM Send Embed Error]', err);
         deleteDmSession(sessionId);
-        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} Failed to send DM: ${err.message}`);
+        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Failed to send DM: ${err.message}`);
         return interaction.editReply({ embeds: [errEmbed], components: [] });
       }
     }
@@ -1966,7 +1964,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('dm_modal_simple_', '');
       const session = getDmSession(sessionId);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} DM session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -1981,16 +1979,15 @@ export default async function handleInteraction(interaction) {
           addGuildAudit(guildId, 'direct-messages', 'DM_COMMAND_SEND', `Sent simple DM to ${targetUser.tag}. Content: ${messageContent}`, interaction.user.tag);
 
           const successEmbed = new EmbedBuilder()
-            .setTitle(`${getCustomEmoji('nexus_success') || statusEmoji('success') || '✅'} Direct Message Delivered`)
+            .setTitle(`${getCustomEmoji('nexus_tick') || '✅'} Direct Message Delivered`)
             .setColor('#10B981')
-            .setDescription(`Your simple message was successfully delivered to <@${targetUser.id}>.`)
+            .setDescription(`Your message was successfully delivered to <@${targetUser.id}>.`)
             .addFields(
               { name: `${getCustomEmoji('nexus_user') || '👤'} Recipient`, value: `**${targetUser.tag || targetUser.username}** (\`${targetUser.id}\`)`, inline: true },
               { name: `${getCustomEmoji('nexus_info') || '✉️'} Format`, value: '`Plain Text`', inline: true },
               { name: `${getCustomEmoji('nexus_date') || '🕒'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true },
-              { name: `${getCustomEmoji('nexus_message') || '📝'} Content Preview`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
-            )
-            .setFooter({ text: 'NexusBot • Direct Message' });
+              { name: `${getCustomEmoji('nexus_message') || '📝'} Content`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
+            );
 
           deleteDmSession(sessionId);
           return interaction.editReply({ embeds: [successEmbed] });
@@ -2016,16 +2013,15 @@ export default async function handleInteraction(interaction) {
           addGuildAudit(guildId, 'direct-messages', 'DMGLOBAL_COMMAND_SEND', `Sent global simple DM to ${successCount} members (Failed: ${failCount})`, interaction.user.tag);
 
           const successEmbed = new EmbedBuilder()
-            .setTitle(`${getCustomEmoji('nexus_success') || statusEmoji('success') || '📢'} DM Broadcast Completed`)
+            .setTitle(`${getCustomEmoji('nexus_tick') || '📢'} DM Broadcast Completed`)
             .setColor('#10B981')
-            .setDescription(`Global DM broadcast execution completed for **${interaction.guild.name}**.`)
+            .setDescription(`Global DM broadcast completed for **${interaction.guild.name}**.`)
             .addFields(
-              { name: `${getCustomEmoji('nexus_success') || '✅'} Successful Deliveries`, value: `\`${successCount}\` members`, inline: true },
-              { name: `${getCustomEmoji('nexus_error') || '❌'} Failed Deliveries`, value: `\`${failCount}\` members`, inline: true },
-              { name: `${getCustomEmoji('nexus_settings') || '🎯'} Targeted Filter`, value: targetRole ? `<@&${targetRole.id}>` : '`Entire Server`', inline: true },
-              { name: `${getCustomEmoji('nexus_message') || '📝'} Message Content`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
-            )
-            .setFooter({ text: 'NexusBot • Global Broadcast' });
+              { name: `${getCustomEmoji('nexus_tick') || '✅'} Successful Deliveries`, value: `\`${successCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_cross') || '❌'} Failed Deliveries`, value: `\`${failCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_settings') || '🎯'} Target Role`, value: targetRole ? `<@&${targetRole.id}>` : '`Entire Server`', inline: true },
+              { name: `${getCustomEmoji('nexus_message') || '📝'} Content`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
+            );
 
           deleteDmSession(sessionId);
           return interaction.editReply({ embeds: [successEmbed] });
@@ -2033,7 +2029,7 @@ export default async function handleInteraction(interaction) {
       } catch (err) {
         console.error('[Simple DM Modal Error]', err);
         deleteDmSession(sessionId);
-        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} Failed to send DM: ${err.message}`);
+        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Failed to send DM: ${err.message}`);
         return interaction.editReply({ embeds: [errEmbed] });
       }
     }
@@ -2046,7 +2042,7 @@ export default async function handleInteraction(interaction) {
 
       const session = getDmSession(sessionId);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} DM session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 

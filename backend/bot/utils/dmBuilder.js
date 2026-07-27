@@ -31,12 +31,12 @@ export function createDmSession({ userId, guildId, commandName, targetUser, targ
     targetUser, // User object or null
     targetRole, // Role object or null
     embedData: {
-      title: 'Direct Message',
+      title: '',
       description: '',
       color: '#3B82F6',
       thumbnail: '',
       image: '',
-      footer: 'NexusBot • Direct Message'
+      footer: ''
     }
   };
   activeDmSessions.set(sessionId, session);
@@ -62,18 +62,14 @@ export function getInitialDmDispatchEmbedAndComponents(sessionId) {
 
   const msgIcon = getCustomEmoji('nexus_message') || '✉️';
   const userIcon = getCustomEmoji('nexus_user') || '👤';
-  const infoIcon = getCustomEmoji('nexus_info') || 'ℹ️';
 
   const embed = new EmbedBuilder()
-    .setTitle(`${msgIcon} Direct Message Dispatcher`)
+    .setTitle(`${msgIcon} Direct Message`)
     .setColor('#3B82F6')
     .setDescription(
-      `${userIcon} **Target Recipient**: ${targetText}\n\n` +
-      `${infoIcon} **Select Message Type**:\n` +
-      `Choose how you would like to compose and dispatch your message below.`
-    )
-    .setFooter({ text: 'NexusBot • DM Dispatcher' })
-    .setTimestamp();
+      `${userIcon} **Recipient**: ${targetText}\n\n` +
+      `Select message format below:`
+    );
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -84,12 +80,12 @@ export function getInitialDmDispatchEmbedAndComponents(sessionId) {
     new ButtonBuilder()
       .setCustomId(`dm_btn_embed_${sessionId}`)
       .setLabel('Embed')
-      .setEmoji(getCustomEmojiObject('nexus_custom') || getCustomEmojiObject('nexus_settings') || { name: '🎨' })
+      .setEmoji(getCustomEmojiObject('nexus_prefix') || { name: '📜' })
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(`dm_btn_cancel_${sessionId}`)
       .setLabel('Cancel')
-      .setEmoji(getCustomEmojiObject('nexus_error') || { name: '❌' })
+      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '❌' })
       .setStyle(ButtonStyle.Danger)
   );
 
@@ -104,27 +100,26 @@ export function getEmbedBuilderViewAndComponents(sessionId) {
   if (!session) return null;
 
   const { embedData } = session;
-  const customIcon = getCustomEmoji('nexus_custom') || getCustomEmoji('nexus_settings') || '🎨';
+  const prefixIcon = getCustomEmoji('nexus_prefix') || '📜';
   const infoIcon = getCustomEmoji('nexus_info') || '📝';
   const msgIcon = getCustomEmoji('nexus_message') || '💬';
   const linkIcon = getCustomEmoji('nexus_link') || '🖼️';
 
   const previewEmbed = new EmbedBuilder()
-    .setTitle(`${customIcon} Custom Embed Builder Preview`)
+    .setTitle(`${prefixIcon} Embed Builder`)
     .setColor(embedData.color || '#3B82F6')
     .setDescription(
       `${infoIcon} **Title**: ${embedData.title || '*Not set*'}\n` +
-      `${msgIcon} **Description/Message**: ${embedData.description || '*Not set (Select "Edit Message / Description" from dropdown below)*'}\n` +
-      `${customIcon} **Hex Color**: \`${embedData.color || '#3B82F6'}\`\n` +
-      `${linkIcon} **Thumbnail URL**: ${embedData.thumbnail ? `\`${embedData.thumbnail}\`` : '*None*'}\n` +
-      `${linkIcon} **Banner Image URL**: ${embedData.image ? `\`${embedData.image}\`` : '*None*'}\n` +
-      `${infoIcon} **Footer Text**: ${embedData.footer ? `\`${embedData.footer}\`` : '*None*'}`
-    )
-    .setFooter({ text: 'Select an option below to customize embed fields instantly' });
+      `${msgIcon} **Description**: ${embedData.description || '*Not set*'}\n` +
+      `${prefixIcon} **Hex Color**: \`${embedData.color || '#3B82F6'}\`\n` +
+      `${linkIcon} **Thumbnail URL**: ${embedData.thumbnail ? `\`${embedData.thumbnail}\`` : '*Not set*'}\n` +
+      `${linkIcon} **Banner Image URL**: ${embedData.image ? `\`${embedData.image}\`` : '*Not set*'}\n` +
+      `${infoIcon} **Footer**: ${embedData.footer ? `\`${embedData.footer}\`` : '*Not set*'}`
+    );
 
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId(`dm_select_field_${sessionId}`)
-    .setPlaceholder('Click to edit embed fields...')
+    .setPlaceholder('Select field to edit...')
     .addOptions([
       {
         label: 'Edit Title',
@@ -133,33 +128,33 @@ export function getEmbedBuilderViewAndComponents(sessionId) {
         emoji: getCustomEmojiObject('nexus_info') || { name: '📝' }
       },
       {
-        label: 'Edit Message / Description',
+        label: 'Edit Description',
         value: 'description',
-        description: 'Set main message body content',
+        description: 'Set message body description',
         emoji: getCustomEmojiObject('nexus_message') || { name: '💬' }
       },
       {
-        label: 'Edit Color (Hex)',
+        label: 'Edit Color',
         value: 'color',
-        description: 'Change embed accent hex color (e.g. #3B82F6)',
-        emoji: getCustomEmojiObject('nexus_settings') || { name: '🎨' }
+        description: 'Set hex color code (e.g. #3B82F6)',
+        emoji: getCustomEmojiObject('nexus_prefix') || getCustomEmojiObject('nexus_settings') || { name: '🎨' }
       },
       {
-        label: 'Edit Thumbnail URL',
+        label: 'Edit Thumbnail',
         value: 'thumbnail',
-        description: 'Set small icon URL on the top right',
+        description: 'Set thumbnail image URL',
         emoji: getCustomEmojiObject('nexus_link') || { name: '🖼️' }
       },
       {
-        label: 'Edit Banner Image URL',
+        label: 'Edit Banner Image',
         value: 'image',
-        description: 'Set large banner image URL at the bottom',
+        description: 'Set banner image URL',
         emoji: getCustomEmojiObject('nexus_link') || { name: '🖼️' }
       },
       {
-        label: 'Edit Footer Text',
+        label: 'Edit Footer',
         value: 'footer',
-        description: 'Set custom footer text at the bottom',
+        description: 'Set footer text',
         emoji: getCustomEmojiObject('nexus_info') || { name: '📑' }
       }
     ]);
@@ -170,12 +165,12 @@ export function getEmbedBuilderViewAndComponents(sessionId) {
     new ButtonBuilder()
       .setCustomId(`dm_btn_send_embed_${sessionId}`)
       .setLabel('Send DM')
-      .setEmoji(getCustomEmojiObject('nexus_success') || { name: '🚀' })
+      .setEmoji(getCustomEmojiObject('nexus_tick') || { name: '✅' })
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`dm_btn_cancel_${sessionId}`)
       .setLabel('Cancel')
-      .setEmoji(getCustomEmojiObject('nexus_error') || { name: '❌' })
+      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '❌' })
       .setStyle(ButtonStyle.Danger)
   );
 
