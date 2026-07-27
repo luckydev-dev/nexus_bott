@@ -21,7 +21,7 @@ export async function getServerInfoEmbedAndComponents(guild, category = 'general
     // Ignore fetch errors
   }
 
-  const embed = new EmbedBuilder().setColor('#3B82F6');
+  const embed = new EmbedBuilder().setColor('#27272f');
 
   if (guild.iconURL()) {
     embed.setThumbnail(guild.iconURL({ dynamic: true, size: 256 }));
@@ -66,13 +66,12 @@ export async function getServerInfoEmbedAndComponents(guild, category = 'general
     const boostTier = guild.premiumTier || 0;
     const boostCount = guild.premiumSubscriptionCount || 0;
 
-    embed.setDescription(
-      `__**Server Statistics**__\n` +
-      `${shieldIcon} **Verification Level**: ${verifStr}\n` +
-      `${channelIcon} **Channels**: ${channelsCount}\n` +
-      `${rolesIcon} **Roles**: ${rolesCount}\n` +
-      `${emojisIcon} **Emojis**: ${emojisCount}\n` +
-      `${infoIcon} **Boosts**: Level ${boostTier} (${boostCount} boosts)`
+    embed.addFields(
+      { name: `${shieldIcon} Verification Level`, value: verifStr, inline: true },
+      { name: `${channelIcon} Channels`, value: `${channelsCount}`, inline: true },
+      { name: `${rolesIcon} Roles`, value: `${rolesCount}`, inline: true },
+      { name: `${emojisIcon} Emojis`, value: `${emojisCount}`, inline: true },
+      { name: `${infoIcon} Boosts`, value: `Level ${boostTier} (${boostCount} boosts)`, inline: true }
     );
   } else if (category === 'roles') {
     const sortedRoles = guild.roles.cache.sort((a, b) => b.position - a.position);
@@ -96,13 +95,12 @@ export async function getServerInfoEmbedAndComponents(guild, category = 'general
 
     embed.setTitle(`${icon} General Info ${guild.name}`);
 
-    embed.setDescription(
-      `__**General Info**__\n` +
-      `${serverIcon} **Name**: ${guild.name}\n` +
-      `${idIcon} **Server ID**: \`${guild.id}\`\n` +
-      `${ownerIcon} **Owner**: ${ownerMention}${ownerTag}\n` +
-      `${dateIcon} **Created**: ${dateStr}\n` +
-      `${userIcon} **Members**: ${guild.memberCount}`
+    embed.addFields(
+      { name: `${serverIcon} Server Name`, value: guild.name, inline: true },
+      { name: `${idIcon} Server ID`, value: `\`${guild.id}\``, inline: true },
+      { name: `${ownerIcon} Owner`, value: `${ownerMention}${ownerTag}`, inline: false },
+      { name: `${dateIcon} Created`, value: dateStr, inline: true },
+      { name: `${userIcon} Members`, value: `${guild.memberCount}`, inline: true }
     );
   }
 

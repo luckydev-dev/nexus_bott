@@ -15,6 +15,7 @@ import { issueWarning } from '../utils/warnings.js';
 
 import { getHelpEmbedAndComponents, setHelpTimeout } from '../utils/helpEmbed.js';
 import { getServerInfoEmbedAndComponents } from '../utils/serverInfoEmbed.js';
+import { getUserInfoEmbedAndComponents } from '../utils/userInfoEmbed.js';
 
 // In-memory message tracker for Anti-Spam
 const messageTimestamps = new Map();
@@ -732,37 +733,8 @@ async function handlePrefixCommand(message, settings) {
   if (['userinfo', 'user', 'whois'].includes(command)) {
     const targetMember = (await parseMember(guild, args[0])) || member;
     const targetUser = targetMember.user;
-
-    const warningsPath = path.join(DATA_DIR, guildId, 'warnings.json');
-    let warnings = [];
-    try { warnings = JSON.parse(fs.readFileSync(warningsPath, 'utf8')); } catch (e) {}
-    const userWarns = warnings.filter(w => w.memberId === targetUser.id && w.active !== false);
-
-    const joinedAtStr = targetMember.joinedAt ? `<t:${Math.floor(targetMember.joinedAt.getTime() / 1000)}:R>` : 'Unknown';
-    const createdAtStr = `<t:${Math.floor(targetUser.createdAt.getTime() / 1000)}:R>`;
-    const isTimedOut = targetMember.isCommunicationDisabled?.();
-
-    const rolesList = targetMember.roles.cache
-      .filter(r => r.name !== '@everyone')
-      .map(r => `<@&${r.id}>`)
-      .slice(0, 10)
-      .join(', ') || 'None';
-
-    const embed = new EmbedBuilder()
-      .setTitle(`${userIcon} Member Security Profile: ${targetUser.tag}`)
-      .setColor('#5865F2')
-      .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
-      .addFields(
-        { name: 'User Identifier', value: `<@${targetUser.id}>\n\`${targetUser.id}\``, inline: true },
-        { name: 'Bot Account', value: targetUser.bot ? '🤖 Yes' : '👤 No', inline: true },
-        { name: 'Account Created', value: createdAtStr, inline: true },
-        { name: 'Joined Server', value: joinedAtStr, inline: true },
-        { name: 'Active Warnings', value: `\`${userWarns.length}\``, inline: true },
-        { name: 'Timeout Status', value: isTimedOut ? '⏳ Active Timeout' : '✅ Clean', inline: true },
-        { name: 'Roles', value: rolesList, inline: false }
-      )
-      .setTimestamp();
-    await message.reply({ embeds: [embed] });
+    const { embeds, components } = await getUserInfoEmbedAndComponents(guild, targetUser, 'general', author);
+    await message.reply({ embeds, components });
     return true;
   }
 

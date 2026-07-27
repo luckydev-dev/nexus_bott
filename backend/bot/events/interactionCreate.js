@@ -11,6 +11,7 @@ import { getEmoji, Emojis } from '../utils/emojis.js';
 import { CUSTOM_EMOJIS, getCustomEmoji } from '../utils/customEmojis.js';
 import { getHelpEmbedAndComponents, setHelpTimeout, clearHelpTimeout } from '../utils/helpEmbed.js';
 import { getServerInfoEmbedAndComponents } from '../utils/serverInfoEmbed.js';
+import { getUserInfoEmbedAndComponents } from '../utils/userInfoEmbed.js';
 import {
   createDmSession,
   getDmSession,
@@ -1589,42 +1590,8 @@ export default async function handleInteraction(interaction) {
       await interaction.deferReply();
 
       try {
-        const member = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-        const warningsPath = path.join(DATA_DIR, guildId, 'warnings.json');
-        let warnings = [];
-        try { warnings = JSON.parse(fs.readFileSync(warningsPath, 'utf8')); } catch (e) {}
-
-        const userWarns = warnings.filter(w => w.memberId === targetUser.id && w.active !== false);
-
-        const joinedAtStr = member?.joinedAt ? `<t:${Math.floor(member.joinedAt.getTime() / 1000)}:R>` : 'Unknown';
-        const createdAtStr = `<t:${Math.floor(targetUser.createdAt.getTime() / 1000)}:R>`;
-        const isTimedOut = member?.isCommunicationDisabled?.();
-        const timeoutUntil = isTimedOut ? `<t:${Math.floor(member.communicationDisabledUntil.getTime() / 1000)}:R>` : 'None';
-
-        const rolesList = member?.roles?.cache
-          ?.filter(r => r.name !== '@everyone')
-          ?.sort((a, b) => b.position - a.position)
-          ?.map(r => `<@&${r.id}>`)
-          ?.slice(0, 10)
-          ?.join(', ') || 'None';
-
-        const embed = new EmbedBuilder()
-          .setTitle(`${userIcon} Member Security Profile: ${targetUser.tag}`)
-          .setColor('#5865F2')
-          .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }))
-          .addFields(
-            { name: 'User Identifier', value: `<@${targetUser.id}>\n\`${targetUser.id}\``, inline: true },
-            { name: 'Bot Account', value: targetUser.bot ? '🤖 Yes' : '👤 No', inline: true },
-            { name: 'Account Created', value: createdAtStr, inline: true },
-            { name: 'Joined Server', value: joinedAtStr, inline: true },
-            { name: 'Active Warnings', value: `\`${userWarns.length}\``, inline: true },
-            { name: 'Timeout Status', value: isTimedOut ? `⏳ Muted until ${timeoutUntil}` : '✅ Active', inline: true },
-            { name: 'Top Role', value: member?.roles?.highest ? `<@&${member.roles.highest.id}>` : 'None', inline: true },
-            { name: 'Roles Overview', value: rolesList, inline: false }
-          )
-          .setTimestamp();
-
-        return interaction.editReply({ embeds: [embed] });
+        const { embeds, components } = await getUserInfoEmbedAndComponents(interaction.guild, targetUser, 'general', interaction.user);
+        return interaction.editReply({ embeds, components });
       } catch (err) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to fetch member info: ${err.message}`);
         return interaction.editReply({ embeds: [embed] });
@@ -1817,6 +1784,15 @@ export default async function handleInteraction(interaction) {
     }
   } else if (interaction.isStringSelectMenu()) {
     const { customId, values } = interaction;
+    if (customId.startsWith('userinfo_category_select_')) {
+      const targetUserId = customId.replace('userinfo_category_select_', '');
+      const val = values[0]; // 'userinfo_general', 'userinfo_stats', 'userinfo_roles', 'userinfo_avatar'
+      const category = val.replace('userinfo_', '');
+      const targetUser = await client.users.fetch(targetUserId).catch(() => interaction.user);
+      const { embeds, components } = await getUserInfoEmbedAndComponents(interaction.guild, targetUser, category, interaction.user);
+      await interaction.update({ embeds, components });
+      return;
+    }
     if (customId === 'serverinfo_category_select') {
       const val = values[0]; // 'serverinfo_general', 'serverinfo_stats', 'serverinfo_roles'
       const category = val.replace('serverinfo_', '');
