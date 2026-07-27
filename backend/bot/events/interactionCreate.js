@@ -11,6 +11,15 @@ import { getEmoji, Emojis } from '../utils/emojis.js';
 import { CUSTOM_EMOJIS, getCustomEmoji } from '../utils/customEmojis.js';
 import { getHelpEmbedAndComponents, setHelpTimeout, clearHelpTimeout } from '../utils/helpEmbed.js';
 import { getServerInfoEmbedAndComponents } from '../utils/serverInfoEmbed.js';
+import {
+  createDmSession,
+  getDmSession,
+  deleteDmSession,
+  getInitialDmDispatchEmbedAndComponents,
+  getEmbedBuilderViewAndComponents,
+  createEmbedFieldModal,
+  createSimpleMessageModal
+} from '../utils/dmBuilder.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -544,53 +553,20 @@ export default async function handleInteraction(interaction) {
       }
 
       const targetUser = interaction.options.getUser('user');
-      const messageContent = interaction.options.getString('message');
-      const titleInput = interaction.options.getString('title');
-      const colorInput = interaction.options.getString('color');
-      const thumbnailInput = interaction.options.getString('thumbnail');
-      const imageInput = interaction.options.getString('image');
-      const footerInput = interaction.options.getString('footer');
-      const useEmbedOption = interaction.options.getBoolean('embed');
-
-      const shouldEmbed = useEmbedOption !== false;
-
-      await interaction.deferReply({ ephemeral: true });
-
-      try {
-        if (shouldEmbed) {
-          const dmEmbed = buildCustomDmEmbed({
-            title: titleInput,
-            message: messageContent,
-            color: colorInput,
-            thumbnail: thumbnailInput,
-            image: imageInput,
-            footer: footerInput
-          });
-          await targetUser.send({ embeds: [dmEmbed] });
-        } else {
-          await targetUser.send({ content: messageContent });
-        }
-
-        addGuildAudit(guildId, 'direct-messages', 'DM_COMMAND_SEND', `Sent DM command to ${targetUser.tag}. Content: ${messageContent}`, interaction.user.tag);
-
-        const respEmbed = new EmbedBuilder()
-          .setTitle(`${statusEmoji('success') || '✅'} Direct Message Delivered`)
-          .setColor('#10B981')
-          .setDescription(`Your message was successfully delivered to <@${targetUser.id}>.`)
-          .addFields(
-            { name: `${statusEmoji('user') || '👤'} Recipient`, value: `**${targetUser.tag}** (\`${targetUser.id}\`)`, inline: true },
-            { name: `${statusEmoji('message') || '✉️'} Format`, value: shouldEmbed ? '`Rich Embed`' : '`Plain Text`', inline: true },
-            { name: `${statusEmoji('date') || '🕒'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true },
-            { name: `${statusEmoji('info') || '📝'} Content Preview`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
-          )
-          .setFooter({ text: `NexusBot • Direct Message` })
-          .setTimestamp();
-        return interaction.editReply({ embeds: [respEmbed] });
-      } catch (err) {
-        console.error('[Slash DM Command Error]', err);
-        const respEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to send DM to <@${targetUser.id}>. They may have DMs closed or blocked the bot.`);
-        return interaction.editReply({ embeds: [respEmbed] });
+      if (!targetUser) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Please specify a valid target user.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
       }
+
+      const sessionId = createDmSession({
+        userId: interaction.user.id,
+        guildId: interaction.guildId,
+        commandName: 'dm',
+        targetUser
+      });
+
+      const { embeds, components } = getInitialDmDispatchEmbedAndComponents(sessionId);
+      return interaction.reply({ embeds, components, ephemeral: true });
     }
 
     if (commandName === 'dmroll') {
@@ -684,79 +660,17 @@ export default async function handleInteraction(interaction) {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
-      const messageContent = interaction.options.getString('message');
       const targetRole = interaction.options.getRole('role');
-      const titleInput = interaction.options.getString('title');
-      const colorInput = interaction.options.getString('color');
-      const thumbnailInput = interaction.options.getString('thumbnail');
-      const imageInput = interaction.options.getString('image');
-      const footerInput = interaction.options.getString('footer');
-      const useEmbedOption = interaction.options.getBoolean('embed');
 
-      const shouldEmbed = useEmbedOption !== false;
+      const sessionId = createDmSession({
+        userId: interaction.user.id,
+        guildId: interaction.guildId,
+        commandName: 'dmglobal',
+        targetRole
+      });
 
-      await interaction.deferReply({ ephemeral: true });
-
-      try {
-        const members = await interaction.guild.members.fetch();
-        let pool = members.filter(m => !m.user.bot);
-        if (targetRole) {
-          pool = pool.filter(m => m.roles.cache.has(targetRole.id));
-        }
-
-        if (pool.size === 0) {
-          const respEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} No eligible members found to broadcast DM to.`);
-          return interaction.editReply({ embeds: [respEmbed] });
-        }
-
-        const progressEmbed = new EmbedBuilder().setColor('#3B82F6').setDescription(`${loadingIcon} Starting DM broadcast to **${pool.size}** members...`);
-        await interaction.editReply({ embeds: [progressEmbed] });
-
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const [_, member] of pool) {
-          try {
-            if (shouldEmbed) {
-              const dmEmbed = buildCustomDmEmbed({
-                title: titleInput,
-                message: messageContent,
-                color: colorInput,
-                thumbnail: thumbnailInput,
-                image: imageInput,
-                footer: footerInput
-              });
-              await member.send({ embeds: [dmEmbed] });
-            } else {
-              await member.send({ content: messageContent });
-            }
-            successCount++;
-          } catch (e) {
-            failCount++;
-          }
-        }
-
-        addGuildAudit(guildId, 'direct-messages', 'DMGLOBAL_COMMAND_SEND', `Sent global DM to ${successCount} members (Failed: ${failCount}, Role filter: ${targetRole ? targetRole.name : 'None'}). Content: ${messageContent}`, interaction.user.tag);
-
-        const finalEmbed = new EmbedBuilder()
-          .setTitle(`${statusEmoji('announce') || statusEmoji('success') || '📢'} DM Broadcast Completed`)
-          .setColor('#10B981')
-          .setDescription(`Global DM broadcast execution completed for **${interaction.guild.name}**.`)
-          .addFields(
-            { name: `${statusEmoji('success') || '✅'} Successful Deliveries`, value: `\`${successCount}\` members`, inline: true },
-            { name: `${statusEmoji('error') || '❌'} Failed Deliveries`, value: `\`${failCount}\` members`, inline: true },
-            { name: `${statusEmoji('settings') || '🎯'} Targeted Filter`, value: targetRole ? `<@&${targetRole.id}>` : '`Entire Server`', inline: true },
-            { name: `${statusEmoji('info') || '📝'} Message Content`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
-          )
-          .setFooter({ text: `NexusBot • Global Broadcast` })
-          .setTimestamp();
-
-        return interaction.editReply({ embeds: [finalEmbed] });
-      } catch (err) {
-        console.error('[Slash DmGlobal Command Error]', err);
-        const respEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to broadcast DM: ${err.message}`);
-        return interaction.editReply({ embeds: [respEmbed] });
-      }
+      const { embeds, components } = getInitialDmDispatchEmbedAndComponents(sessionId);
+      return interaction.reply({ embeds, components, ephemeral: true });
     }
 
     // 6. Manual warn command
@@ -1901,6 +1815,12 @@ export default async function handleInteraction(interaction) {
       setHelpTimeout(interaction, selectedCategory, context);
       return;
     }
+    if (customId.startsWith('dm_select_field_')) {
+      const sessionId = customId.replace('dm_select_field_', '');
+      const fieldName = values[0];
+      const modal = createEmbedFieldModal(sessionId, fieldName);
+      return interaction.showModal(modal);
+    }
   } else if (interaction.isButton()) {
     const { customId } = interaction;
     if (customId.startsWith('help_page_')) {
@@ -1933,6 +1853,208 @@ export default async function handleInteraction(interaction) {
       await interaction.update({ embeds, components });
       setHelpTimeout(interaction, selectedCategory, context);
       return;
+    }
+
+    if (customId.startsWith('dm_btn_simple_')) {
+      const sessionId = customId.replace('dm_btn_simple_', '');
+      const modal = createSimpleMessageModal(sessionId);
+      return interaction.showModal(modal);
+    }
+
+    if (customId.startsWith('dm_btn_embed_')) {
+      const sessionId = customId.replace('dm_btn_embed_', '');
+      const view = getEmbedBuilderViewAndComponents(sessionId);
+      if (!view) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} DM session expired or invalid.`);
+        return interaction.update({ embeds: [embed], components: [] });
+      }
+      return interaction.update({ embeds: view.embeds, components: view.components });
+    }
+
+    if (customId.startsWith('dm_btn_cancel_')) {
+      const sessionId = customId.replace('dm_btn_cancel_', '');
+      deleteDmSession(sessionId);
+      const cancelEmbed = new EmbedBuilder()
+        .setColor('#EF4444')
+        .setTitle(`${getCustomEmoji('nexus_error') || '❌'} Dispatch Cancelled`)
+        .setDescription('The direct message dispatch setup was cancelled.');
+      return interaction.update({ embeds: [cancelEmbed], components: [] });
+    }
+
+    if (customId.startsWith('dm_btn_send_embed_')) {
+      const sessionId = customId.replace('dm_btn_send_embed_', '');
+      const session = getDmSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} DM session expired or invalid.`);
+        return interaction.update({ embeds: [embed], components: [] });
+      }
+
+      await interaction.deferUpdate();
+
+      try {
+        const { embedData, commandName, targetUser, targetRole, guildId } = session;
+        const customEmbed = new EmbedBuilder().setColor(embedData.color || '#3B82F6');
+        if (embedData.title) customEmbed.setTitle(embedData.title);
+        if (embedData.description) customEmbed.setDescription(embedData.description);
+        if (embedData.thumbnail) customEmbed.setThumbnail(embedData.thumbnail);
+        if (embedData.image) customEmbed.setImage(embedData.image);
+        if (embedData.footer) customEmbed.setFooter({ text: embedData.footer });
+
+        if (commandName === 'dm') {
+          await targetUser.send({ embeds: [customEmbed] });
+          addGuildAudit(guildId, 'direct-messages', 'DM_COMMAND_SEND', `Sent DM embed to ${targetUser.tag}`, interaction.user.tag);
+
+          const successEmbed = new EmbedBuilder()
+            .setTitle(`${getCustomEmoji('nexus_success') || statusEmoji('success') || '✅'} Direct Message Delivered`)
+            .setColor('#10B981')
+            .setDescription(`Your custom embed message was successfully delivered to <@${targetUser.id}>.`)
+            .addFields(
+              { name: `${getCustomEmoji('nexus_user') || '👤'} Recipient`, value: `**${targetUser.tag || targetUser.username}** (\`${targetUser.id}\`)`, inline: true },
+              { name: `${getCustomEmoji('nexus_info') || '✉️'} Format`, value: '`Custom Embed`', inline: true },
+              { name: `${getCustomEmoji('nexus_date') || '🕒'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
+            )
+            .setFooter({ text: 'NexusBot • Direct Message' });
+
+          deleteDmSession(sessionId);
+          return interaction.editReply({ embeds: [successEmbed], components: [] });
+        } else if (commandName === 'dmglobal') {
+          const members = await interaction.guild.members.fetch();
+          let pool = members.filter(m => !m.user.bot);
+          if (targetRole) {
+            pool = pool.filter(m => m.roles.cache.has(targetRole.id));
+          }
+
+          let successCount = 0;
+          let failCount = 0;
+
+          for (const [_, member] of pool) {
+            try {
+              await member.send({ embeds: [customEmbed] });
+              successCount++;
+            } catch (e) {
+              failCount++;
+            }
+          }
+
+          addGuildAudit(guildId, 'direct-messages', 'DMGLOBAL_COMMAND_SEND', `Sent global DM embed to ${successCount} members (Failed: ${failCount})`, interaction.user.tag);
+
+          const successEmbed = new EmbedBuilder()
+            .setTitle(`${getCustomEmoji('nexus_success') || statusEmoji('success') || '📢'} DM Broadcast Completed`)
+            .setColor('#10B981')
+            .setDescription(`Global embed DM broadcast execution completed for **${interaction.guild.name}**.`)
+            .addFields(
+              { name: `${getCustomEmoji('nexus_success') || '✅'} Successful Deliveries`, value: `\`${successCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_error') || '❌'} Failed Deliveries`, value: `\`${failCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_settings') || '🎯'} Targeted Filter`, value: targetRole ? `<@&${targetRole.id}>` : '`Entire Server`', inline: true }
+            )
+            .setFooter({ text: 'NexusBot • Global Broadcast' });
+
+          deleteDmSession(sessionId);
+          return interaction.editReply({ embeds: [successEmbed], components: [] });
+        }
+      } catch (err) {
+        console.error('[DM Send Embed Error]', err);
+        deleteDmSession(sessionId);
+        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} Failed to send DM: ${err.message}`);
+        return interaction.editReply({ embeds: [errEmbed], components: [] });
+      }
+    }
+  } else if (interaction.isModalSubmit()) {
+    const { customId } = interaction;
+
+    if (customId.startsWith('dm_modal_simple_')) {
+      const sessionId = customId.replace('dm_modal_simple_', '');
+      const session = getDmSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} DM session expired or invalid.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      const messageContent = interaction.fields.getTextInputValue('simple_message');
+      const { commandName, targetUser, targetRole, guildId } = session;
+
+      await interaction.deferReply({ ephemeral: true });
+
+      try {
+        if (commandName === 'dm') {
+          await targetUser.send({ content: messageContent });
+          addGuildAudit(guildId, 'direct-messages', 'DM_COMMAND_SEND', `Sent simple DM to ${targetUser.tag}. Content: ${messageContent}`, interaction.user.tag);
+
+          const successEmbed = new EmbedBuilder()
+            .setTitle(`${getCustomEmoji('nexus_success') || statusEmoji('success') || '✅'} Direct Message Delivered`)
+            .setColor('#10B981')
+            .setDescription(`Your simple message was successfully delivered to <@${targetUser.id}>.`)
+            .addFields(
+              { name: `${getCustomEmoji('nexus_user') || '👤'} Recipient`, value: `**${targetUser.tag || targetUser.username}** (\`${targetUser.id}\`)`, inline: true },
+              { name: `${getCustomEmoji('nexus_info') || '✉️'} Format`, value: '`Plain Text`', inline: true },
+              { name: `${getCustomEmoji('nexus_date') || '🕒'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true },
+              { name: `${getCustomEmoji('nexus_message') || '📝'} Content Preview`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
+            )
+            .setFooter({ text: 'NexusBot • Direct Message' });
+
+          deleteDmSession(sessionId);
+          return interaction.editReply({ embeds: [successEmbed] });
+        } else if (commandName === 'dmglobal') {
+          const members = await interaction.guild.members.fetch();
+          let pool = members.filter(m => !m.user.bot);
+          if (targetRole) {
+            pool = pool.filter(m => m.roles.cache.has(targetRole.id));
+          }
+
+          let successCount = 0;
+          let failCount = 0;
+
+          for (const [_, member] of pool) {
+            try {
+              await member.send({ content: messageContent });
+              successCount++;
+            } catch (e) {
+              failCount++;
+            }
+          }
+
+          addGuildAudit(guildId, 'direct-messages', 'DMGLOBAL_COMMAND_SEND', `Sent global simple DM to ${successCount} members (Failed: ${failCount})`, interaction.user.tag);
+
+          const successEmbed = new EmbedBuilder()
+            .setTitle(`${getCustomEmoji('nexus_success') || statusEmoji('success') || '📢'} DM Broadcast Completed`)
+            .setColor('#10B981')
+            .setDescription(`Global DM broadcast execution completed for **${interaction.guild.name}**.`)
+            .addFields(
+              { name: `${getCustomEmoji('nexus_success') || '✅'} Successful Deliveries`, value: `\`${successCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_error') || '❌'} Failed Deliveries`, value: `\`${failCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_settings') || '🎯'} Targeted Filter`, value: targetRole ? `<@&${targetRole.id}>` : '`Entire Server`', inline: true },
+              { name: `${getCustomEmoji('nexus_message') || '📝'} Message Content`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
+            )
+            .setFooter({ text: 'NexusBot • Global Broadcast' });
+
+          deleteDmSession(sessionId);
+          return interaction.editReply({ embeds: [successEmbed] });
+        }
+      } catch (err) {
+        console.error('[Simple DM Modal Error]', err);
+        deleteDmSession(sessionId);
+        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} Failed to send DM: ${err.message}`);
+        return interaction.editReply({ embeds: [errEmbed] });
+      }
+    }
+
+    if (customId.startsWith('dm_modal_field_')) {
+      const rest = customId.replace('dm_modal_field_', '');
+      const parts = rest.split('_');
+      const fieldName = parts[0];
+      const sessionId = parts.slice(1).join('_');
+
+      const session = getDmSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} DM session expired or invalid.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      const newValue = interaction.fields.getTextInputValue('field_value');
+      session.embedData[fieldName] = newValue;
+
+      const view = getEmbedBuilderViewAndComponents(sessionId);
+      return interaction.update({ embeds: view.embeds, components: view.components });
     }
   }
 }

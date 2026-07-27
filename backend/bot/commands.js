@@ -399,48 +399,6 @@ export const commands = [
         description: 'The user to send the DM to',
         type: 6, // USER
         required: true
-      },
-      {
-        name: 'message',
-        description: 'The main message content or description',
-        type: 3, // STRING
-        required: true
-      },
-      {
-        name: 'title',
-        description: 'Custom title for the DM embed (optional)',
-        type: 3, // STRING
-        required: false
-      },
-      {
-        name: 'color',
-        description: 'Custom hex color e.g. #3B82F6 or Red/Blue (optional)',
-        type: 3, // STRING
-        required: false
-      },
-      {
-        name: 'thumbnail',
-        description: 'Direct image URL for thumbnail (optional)',
-        type: 3, // STRING
-        required: false
-      },
-      {
-        name: 'image',
-        description: 'Direct image URL for large banner image (optional)',
-        type: 3, // STRING
-        required: false
-      },
-      {
-        name: 'footer',
-        description: 'Custom footer text (optional)',
-        type: 3, // STRING
-        required: false
-      },
-      {
-        name: 'embed',
-        description: 'Whether to send as rich customizable embed (default: true)',
-        type: 5, // BOOLEAN
-        required: false
       }
     ]
   },
@@ -503,51 +461,9 @@ export const commands = [
     description: 'Send a DM to all members of the server (or filter by role).',
     options: [
       {
-        name: 'message',
-        description: 'The message content or description',
-        type: 3, // STRING
-        required: true
-      },
-      {
         name: 'role',
-        description: 'Send only to members with this role',
+        description: 'Send only to members with this role (optional)',
         type: 8, // ROLE
-        required: false
-      },
-      {
-        name: 'title',
-        description: 'Custom title for the DM embed (optional)',
-        type: 3, // STRING
-        required: false
-      },
-      {
-        name: 'color',
-        description: 'Custom hex color e.g. #3B82F6 (optional)',
-        type: 3, // STRING
-        required: false
-      },
-      {
-        name: 'thumbnail',
-        description: 'Direct image URL for thumbnail (optional)',
-        type: 3, // STRING
-        required: false
-      },
-      {
-        name: 'image',
-        description: 'Direct image URL for large banner image (optional)',
-        type: 3, // STRING
-        required: false
-      },
-      {
-        name: 'footer',
-        description: 'Custom footer text (optional)',
-        type: 3, // STRING
-        required: false
-      },
-      {
-        name: 'embed',
-        description: 'Whether to send as rich customizable embed (default: true)',
-        type: 5, // BOOLEAN
         required: false
       }
     ]

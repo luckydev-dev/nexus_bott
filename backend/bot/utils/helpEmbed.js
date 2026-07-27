@@ -35,7 +35,7 @@ export function setHelpTimeout(target, category, context) {
     } catch (e) {
       // Message deleted or already modified
     }
-  }, 60000);
+  }, 120000);
 
   activeHelpTimeouts.set(msgId, timer);
 }
@@ -153,15 +153,15 @@ export function getHelpEmbedAndComponents(category = 'home', context = {}, isDis
 
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId('help_category_select')
-    .setPlaceholder(isDisabled ? 'Help menu disabled (Timed Out!)' : 'Select a category...')
+    .setPlaceholder('Select a category...')
     .setDisabled(isDisabled);
 
   if (isDisabled) {
     selectMenu.addOptions([
       {
-        label: 'Help menu disabled (Timed Out!)',
+        label: 'Help menu expired',
         value: 'disabled',
-        description: 'This help menu session has expired.'
+        description: 'Select menu is disabled.'
       }
     ]);
   } else {

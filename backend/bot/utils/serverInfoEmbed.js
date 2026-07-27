@@ -44,6 +44,12 @@ export async function getServerInfoEmbedAndComponents(guild, category = 'general
 
   if (category === 'stats') {
     const icon = getCustomEmoji('nexus_stats') || '📁';
+    const shieldIcon = getCustomEmoji('nexus_shield') || '🛡️';
+    const channelIcon = getCustomEmoji('nexus_channel') || '💬';
+    const rolesIcon = getCustomEmoji('nexus_roles') || '🎭';
+    const emojisIcon = getCustomEmoji('nexus_emojis') || '😃';
+    const infoIcon = getCustomEmoji('nexus_info') || '✨';
+
     embed.setTitle(`${icon} Server Statistics`);
 
     const verifLevels = {
@@ -62,15 +68,15 @@ export async function getServerInfoEmbedAndComponents(guild, category = 'general
 
     embed.setDescription(
       `__**Server Statistics**__\n` +
-      `**Verification Level**: ${verifStr}\n` +
-      `**Channels**: ${channelsCount}\n` +
-      `**Roles**: ${rolesCount}\n` +
-      `**Emojis**: ${emojisCount}\n` +
-      `**Boosts**: Level ${boostTier} (${boostCount} boosts)`
+      `${shieldIcon} **Verification Level**: ${verifStr}\n` +
+      `${channelIcon} **Channels**: ${channelsCount}\n` +
+      `${rolesIcon} **Roles**: ${rolesCount}\n` +
+      `${emojisIcon} **Emojis**: ${emojisCount}\n` +
+      `${infoIcon} **Boosts**: Level ${boostTier} (${boostCount} boosts)`
     );
   } else if (category === 'roles') {
     const sortedRoles = guild.roles.cache.sort((a, b) => b.position - a.position);
-    const icon = getCustomEmoji('nexus_admin') || '🔧';
+    const icon = getCustomEmoji('nexus_roles') || '🎭';
     embed.setTitle(`${icon} Roles [${sortedRoles.size}]`);
 
     const roleMentions = sortedRoles.map(r => `<@&${r.id}>`).join('\n');
@@ -81,16 +87,22 @@ export async function getServerInfoEmbedAndComponents(guild, category = 'general
     embed.setDescription(desc || 'No roles found.');
   } else {
     // Default / 'general'
-    const icon = getCustomEmoji('nexus_settings') || '⚙️';
+    const icon = getCustomEmoji('nexus_server') || '🌐';
+    const serverIcon = getCustomEmoji('nexus_server') || '🌐';
+    const idIcon = getCustomEmoji('nexus_ID') || '🆔';
+    const ownerIcon = getCustomEmoji('nexus_owner') || '👑';
+    const dateIcon = getCustomEmoji('nexus_date') || '📅';
+    const userIcon = getCustomEmoji('nexus_user') || '👥';
+
     embed.setTitle(`${icon} General Info ${guild.name}`);
 
     embed.setDescription(
       `__**General Info**__\n` +
-      `**Name**: ${guild.name}\n` +
-      `**Server ID**: ${guild.id}\n` +
-      `**Owner**: ${ownerMention}${ownerTag}\n` +
-      `**Created**: ${dateStr}\n` +
-      `**Members**: ${guild.memberCount}`
+      `${serverIcon} **Name**: ${guild.name}\n` +
+      `${idIcon} **Server ID**: \`${guild.id}\`\n` +
+      `${ownerIcon} **Owner**: ${ownerMention}${ownerTag}\n` +
+      `${dateIcon} **Created**: ${dateStr}\n` +
+      `${userIcon} **Members**: ${guild.memberCount}`
     );
   }
 
@@ -102,7 +114,7 @@ export async function getServerInfoEmbedAndComponents(guild, category = 'general
       {
         label: 'General Info',
         value: 'serverinfo_general',
-        emoji: getCustomEmojiObject('nexus_settings') || { name: '⚙️' }
+        emoji: getCustomEmojiObject('nexus_server') || { name: '🌐' }
       },
       {
         label: 'Statistics',
@@ -112,7 +124,7 @@ export async function getServerInfoEmbedAndComponents(guild, category = 'general
       {
         label: 'Roles',
         value: 'serverinfo_roles',
-        emoji: getCustomEmojiObject('nexus_admin') || { name: '🔧' }
+        emoji: getCustomEmojiObject('nexus_roles') || { name: '🎭' }
       }
     ]);
 
