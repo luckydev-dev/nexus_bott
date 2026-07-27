@@ -20,6 +20,14 @@ import {
   createEmbedFieldModal,
   createSimpleMessageModal
 } from '../utils/dmBuilder.js';
+import {
+  createChannelEmbedSession,
+  getChannelEmbedSession,
+  deleteChannelEmbedSession,
+  getChannelEmbedBuilderViewAndComponents,
+  getChannelSelectViewAndComponents,
+  createChannelEmbedFieldModal
+} from '../utils/channelEmbedBuilder.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -537,7 +545,22 @@ export default async function handleInteraction(interaction) {
       return interaction.reply({ embeds: [defaultEmbed] });
     }
 
-    // 5. Direct Message (DM) Commands
+    // 5. Direct Message (DM) & Embed Commands
+    if (commandName === 'embed') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} **Access Denied**: You require \`ManageMessages\` permission.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      const sessionId = createChannelEmbedSession({
+        userId: interaction.user.id,
+        guildId: interaction.guildId
+      });
+
+      const { embeds, components } = getChannelEmbedBuilderViewAndComponents(sessionId);
+      return interaction.reply({ embeds, components, ephemeral: true });
+    }
+
     if (commandName === 'dm') {
       if (!settings.dms?.enabled) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Direct messaging commands are currently disabled in this server via the dashboard settings.`);
@@ -1821,6 +1844,61 @@ export default async function handleInteraction(interaction) {
       const modal = createEmbedFieldModal(sessionId, fieldName);
       return interaction.showModal(modal);
     }
+    if (customId.startsWith('chan_select_field_')) {
+      const sessionId = customId.replace('chan_select_field_', '');
+      const fieldName = values[0];
+      const modal = createChannelEmbedFieldModal(sessionId, fieldName);
+      return interaction.showModal(modal);
+    }
+  } else if (interaction.isChannelSelectMenu()) {
+    const { customId, values } = interaction;
+    if (customId.startsWith('chan_select_channel_')) {
+      const sessionId = customId.replace('chan_select_channel_', '');
+      const session = getChannelEmbedSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        return interaction.update({ embeds: [embed], components: [] });
+      }
+
+      const channelId = values[0];
+      try {
+        const targetChannel = await interaction.guild.channels.fetch(channelId);
+        if (!targetChannel) {
+          const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Target channel not found.`);
+          return interaction.update({ embeds: [embed], components: [] });
+        }
+
+        const { embedData } = session;
+        const customEmbed = new EmbedBuilder().setColor(embedData.color || '#3B82F6');
+        if (embedData.title && embedData.title.trim()) customEmbed.setTitle(embedData.title.trim());
+        if (embedData.description && embedData.description.trim()) customEmbed.setDescription(embedData.description.trim());
+        if (embedData.thumbnail && embedData.thumbnail.trim()) customEmbed.setThumbnail(embedData.thumbnail.trim());
+        if (embedData.image && embedData.image.trim()) customEmbed.setImage(embedData.image.trim());
+        if (embedData.footer && embedData.footer.trim()) customEmbed.setFooter({ text: embedData.footer.trim() });
+
+        await targetChannel.send({ embeds: [customEmbed] });
+
+        addGuildAudit(interaction.guildId, 'embeds', 'EMBED_COMMAND_SEND', `Sent custom embed to channel <#${channelId}>`, interaction.user.tag);
+
+        const successEmbed = new EmbedBuilder()
+          .setTitle(`${getCustomEmoji('nexus_tick') || '✅'} Embed Sent Successfully`)
+          .setColor('#10B981')
+          .setDescription(`Your custom embed was successfully sent to <#${channelId}>.`)
+          .addFields(
+            { name: `${getCustomEmoji('nexus_settings') || '🎯'} Target Channel`, value: `<#${channelId}>`, inline: true },
+            { name: `${getCustomEmoji('nexus_user') || '👤'} Author`, value: `<@${interaction.user.id}>`, inline: true },
+            { name: `${getCustomEmoji('nexus_date') || '🕒'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
+          );
+
+        deleteChannelEmbedSession(sessionId);
+        return interaction.update({ embeds: [successEmbed], components: [] });
+      } catch (err) {
+        console.error('[Send Channel Embed Error]', err);
+        deleteChannelEmbedSession(sessionId);
+        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Failed to send embed: ${err.message}`);
+        return interaction.update({ embeds: [errEmbed], components: [] });
+      }
+    }
   } else if (interaction.isButton()) {
     const { customId } = interaction;
     if (customId.startsWith('help_page_')) {
@@ -1878,6 +1956,27 @@ export default async function handleInteraction(interaction) {
         .setColor('#EF4444')
         .setTitle(`${getCustomEmoji('nexus_cross') || '❌'} Cancelled`)
         .setDescription('Direct message prompt cancelled.');
+      return interaction.update({ embeds: [cancelEmbed], components: [] });
+    }
+
+    if (customId.startsWith('chan_btn_send_')) {
+      const sessionId = customId.replace('chan_btn_send_', '');
+      const session = getChannelEmbedSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        return interaction.update({ embeds: [embed], components: [] });
+      }
+      const view = getChannelSelectViewAndComponents(sessionId);
+      return interaction.update({ embeds: view.embeds, components: view.components });
+    }
+
+    if (customId.startsWith('chan_btn_cancel_')) {
+      const sessionId = customId.replace('chan_btn_cancel_', '');
+      deleteChannelEmbedSession(sessionId);
+      const cancelEmbed = new EmbedBuilder()
+        .setColor('#EF4444')
+        .setTitle(`${getCustomEmoji('nexus_cross') || '❌'} Cancelled`)
+        .setDescription('Embed builder prompt cancelled.');
       return interaction.update({ embeds: [cancelEmbed], components: [] });
     }
 
@@ -2050,6 +2149,25 @@ export default async function handleInteraction(interaction) {
       session.embedData[fieldName] = newValue;
 
       const view = getEmbedBuilderViewAndComponents(sessionId);
+      return interaction.update({ embeds: view.embeds, components: view.components });
+    }
+
+    if (customId.startsWith('chan_modal_field_')) {
+      const rest = customId.replace('chan_modal_field_', '');
+      const parts = rest.split('_');
+      const fieldName = parts[0];
+      const sessionId = parts.slice(1).join('_');
+
+      const session = getChannelEmbedSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      const newValue = interaction.fields.getTextInputValue('field_value');
+      session.embedData[fieldName] = newValue;
+
+      const view = getChannelEmbedBuilderViewAndComponents(sessionId);
       return interaction.update({ embeds: view.embeds, components: view.components });
     }
   }

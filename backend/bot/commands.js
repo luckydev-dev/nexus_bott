@@ -391,6 +391,10 @@ export const commands = [
     ]
   },
   {
+    name: 'embed',
+    description: 'Create and send a custom embed message to a channel.'
+  },
+  {
     name: 'dm',
     description: 'Send a direct message from the bot to a specific user.',
     options: [
