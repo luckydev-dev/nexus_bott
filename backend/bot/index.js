@@ -11,6 +11,7 @@ import handleInteraction from './events/interactionCreate.js';
 import handleMessage from './events/messageCreate.js';
 import handleGuildMemberAdd from './events/guildMemberAdd.js';
 import handleChannelDelete from './events/channelDelete.js';
+import { handleGuildCreate } from './events/guildCreate.js';
 import {
   handleRoleDelete,
   handleRoleCreate,
@@ -102,6 +103,14 @@ export function initializeDiscordBot() {
       await handleMessage(message);
     } catch (err) {
       console.error('[NexusBot messageCreate Event Error]', err);
+    }
+  });
+
+  client.on('guildCreate', async (guild) => {
+    try {
+      await handleGuildCreate(guild);
+    } catch (err) {
+      console.error('[NexusBot guildCreate Event Error]', err);
     }
   });
 

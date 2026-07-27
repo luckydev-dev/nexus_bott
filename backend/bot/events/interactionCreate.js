@@ -10,6 +10,7 @@ import { statusEmoji, statusEmojiObject } from '../utils/statusEmojis.js';
 import { getEmoji, Emojis } from '../utils/emojis.js';
 import { CUSTOM_EMOJIS, getCustomEmoji } from '../utils/customEmojis.js';
 import { getHelpEmbedAndComponents, setHelpTimeout, clearHelpTimeout } from '../utils/helpEmbed.js';
+import { getServerInfoEmbedAndComponents } from '../utils/serverInfoEmbed.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -1479,39 +1480,6 @@ export default async function handleInteraction(interaction) {
       }
     }
 
-    // 24. Decensor command
-    if (commandName === 'decensor') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} **Access Denied**: \`ManageMessages\` required.`);
-        return interaction.reply({ embeds: [embed], ephemeral: true });
-      }
-      const caseIdInput = interaction.options.getString('case_id');
-      await interaction.deferReply();
-      const warningsPath = path.join(DATA_DIR, guildId, 'warnings.json');
-      let warnings = [];
-      try { warnings = JSON.parse(fs.readFileSync(warningsPath, 'utf8')); } catch (e) {}
-      
-      let cleared = false;
-      warnings = warnings.map(w => {
-        if (w.caseId === caseIdInput.toUpperCase().trim()) {
-          w.active = false;
-          cleared = true;
-        }
-        return w;
-      });
-
-      if (cleared) {
-        fs.writeFileSync(warningsPath, JSON.stringify(warnings, null, 2));
-        addGuildAudit(guildId, 'moderation', 'CASE_DECENSOR', `Decensored case ${caseIdInput}`, interaction.user.tag);
-        
-        const embed = new EmbedBuilder().setColor('#10B981').setDescription(`${successIcon} Case \`${caseIdInput}\` has been decensored/deactivated.`);
-        return interaction.editReply({ embeds: [embed] });
-      } else {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Case ID \`${caseIdInput}\` not found.`);
-        return interaction.editReply({ embeds: [embed] });
-      }
-    }
-
     // 25. Modlogs command
     if (commandName === 'modlogs') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
@@ -1730,32 +1698,8 @@ export default async function handleInteraction(interaction) {
     if (commandName === 'serverinfo') {
       await interaction.deferReply();
       try {
-        const { guild } = interaction;
-        await guild.members.fetch().catch(() => {});
-
-        const totalMembers = guild.memberCount;
-        const botCount = guild.members.cache.filter(m => m.user.bot).size;
-        const humanCount = totalMembers - botCount;
-        const owner = await guild.fetchOwner();
-
-        const embed = new EmbedBuilder()
-          .setTitle(`${shieldIcon} Server Security Overview: ${guild.name}`)
-          .setColor('#3B82F6')
-          .setThumbnail(guild.iconURL({ dynamic: true, size: 256 }))
-          .addFields(
-            { name: 'Server Owner', value: `<@${owner.id}> (\`${owner.user.tag}\`)`, inline: true },
-            { name: 'Server ID', value: `\`${guild.id}\``, inline: true },
-            { name: 'Created Date', value: `<t:${Math.floor(guild.createdAt.getTime() / 1000)}:R>`, inline: true },
-            { name: 'Total Members', value: `👥 **${totalMembers}** (Humans: ${humanCount} | Bots: ${botCount})`, inline: true },
-            { name: 'Channels Count', value: `💬 **${guild.channels.cache.size}** total`, inline: true },
-            { name: 'Roles Count', value: `🎭 **${guild.roles.cache.size}** total`, inline: true },
-            { name: 'Verification Level', value: `\`${guild.verificationLevel}\``, inline: true },
-            { name: 'Explicit Content Filter', value: `\`${guild.explicitContentFilter}\``, inline: true },
-            { name: 'Nexus Security Shield', value: `${settings.automod.enabled ? '✅ AutoMod' : '❌ AutoMod'} • ${settings.antiraid.enabled ? '✅ AntiRaid' : '❌ AntiRaid'} • ${settings.antinuke.enabled ? '✅ AntiNuke' : '❌ AntiNuke'}`, inline: false }
-          )
-          .setTimestamp();
-
-        return interaction.editReply({ embeds: [embed] });
+        const { embeds, components } = await getServerInfoEmbedAndComponents(interaction.guild, 'general', interaction.user);
+        return interaction.editReply({ embeds, components });
       } catch (err) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to fetch server info: ${err.message}`);
         return interaction.editReply({ embeds: [embed] });
@@ -1936,6 +1880,13 @@ export default async function handleInteraction(interaction) {
     }
   } else if (interaction.isStringSelectMenu()) {
     const { customId, values } = interaction;
+    if (customId === 'serverinfo_category_select') {
+      const val = values[0]; // 'serverinfo_general', 'serverinfo_stats', 'serverinfo_roles'
+      const category = val.replace('serverinfo_', '');
+      const { embeds, components } = await getServerInfoEmbedAndComponents(interaction.guild, category, interaction.user);
+      await interaction.update({ embeds, components });
+      return;
+    }
     if (customId === 'help_category_select') {
       const selectedCategory = values[0];
       const settings = interaction.guildId ? getGuildSettings(interaction.guildId) : {};

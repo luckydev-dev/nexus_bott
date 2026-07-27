@@ -8,11 +8,13 @@ import fs from 'fs';
 import path from 'path';
 import { getGuildSettings, addGuildAudit, DATA_DIR } from '../storage.js';
 import { getEmoji } from '../utils/emojis.js';
+import { getCustomEmoji } from '../utils/customEmojis.js';
 import { statusEmoji } from '../utils/statusEmojis.js';
 import { logAutoModViolation, logWarnLimitReached } from '../utils/logger.js';
 import { issueWarning } from '../utils/warnings.js';
 
 import { getHelpEmbedAndComponents, setHelpTimeout } from '../utils/helpEmbed.js';
+import { getServerInfoEmbedAndComponents } from '../utils/serverInfoEmbed.js';
 
 // In-memory message tracker for Anti-Spam
 const messageTimestamps = new Map();
@@ -64,37 +66,31 @@ async function handlePrefixCommand(message, settings) {
     const supportUrl = 'https://discord.gg/8hbsvybVGs';
     const webUrl = 'https://nexusbot.dev';
 
-    const embed = new EmbedBuilder()
-      .setTitle(message.guild.name)
-      .setColor('#2F3136')
-      .setThumbnail(message.guild.iconURL({ dynamic: true }) || message.client.user.displayAvatarURL({ dynamic: true }))
-      .setDescription(
-        `Hey <@${message.author.id}>,\n` +
-        `Prefix for this server is **${prefix}**.\n` +
-        `Server ID:\n` +
-        `\`${message.guild.id}\` \n\n` +
-        `Type \`${prefix}help\` for more information`
-      );
+    const arrowIcon = getCustomEmoji('nexus_arrowright') || '➔';
 
-    const row1 = new ActionRowBuilder().addComponents(
+    const embed = new EmbedBuilder()
+      .setTitle('Thanks for adding me!')
+      .setColor('#3B82F6')
+      .setThumbnail(message.guild.iconURL({ dynamic: true, size: 256 }) || message.client.user.displayAvatarURL({ dynamic: true }))
+      .setDescription(
+        `${arrowIcon} **Prefix For This Server is** \`${prefix}\`\n` +
+        `${arrowIcon} **Get Started with** \`${prefix}help\`\n` +
+        `${arrowIcon} For detailed guides, FAQ & information, visit our **[Support Server](${supportUrl})**`
+      )
+      .setFooter({ text: 'Powered by NexusBot™' });
+
+    const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setLabel('Invite')
-        .setURL(inviteUrl)
+        .setLabel('Support')
+        .setURL(supportUrl)
         .setStyle(ButtonStyle.Link),
       new ButtonBuilder()
-        .setLabel('Web')
+        .setLabel('Website')
         .setURL(webUrl)
         .setStyle(ButtonStyle.Link)
     );
 
-    const row2 = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setLabel('Support')
-        .setURL(supportUrl)
-        .setStyle(ButtonStyle.Link)
-    );
-
-    await message.reply({ embeds: [embed], components: [row1, row2] });
+    await message.reply({ embeds: [embed], components: [row] });
     return true;
   }
 
@@ -772,26 +768,8 @@ async function handlePrefixCommand(message, settings) {
 
   // Command 22: serverinfo
   if (['serverinfo', 'server'].includes(command)) {
-    await guild.members.fetch().catch(() => {});
-    const totalMembers = guild.memberCount;
-    const botCount = guild.members.cache.filter(m => m.user.bot).size;
-    const humanCount = totalMembers - botCount;
-    const owner = await guild.fetchOwner();
-
-    const embed = new EmbedBuilder()
-      .setTitle(`${shieldIcon} Server Security Overview: ${guild.name}`)
-      .setColor('#3B82F6')
-      .setThumbnail(guild.iconURL({ dynamic: true, size: 256 }))
-      .addFields(
-        { name: 'Server Owner', value: `<@${owner.id}> (\`${owner.user.tag}\`)`, inline: true },
-        { name: 'Server ID', value: `\`${guild.id}\``, inline: true },
-        { name: 'Created Date', value: `<t:${Math.floor(guild.createdAt.getTime() / 1000)}:R>`, inline: true },
-        { name: 'Total Members', value: `👥 **${totalMembers}** (Humans: ${humanCount} | Bots: ${botCount})`, inline: true },
-        { name: 'Channels', value: `💬 **${guild.channels.cache.size}** channels`, inline: true },
-        { name: 'Roles', value: `🎭 **${guild.roles.cache.size}** roles`, inline: true }
-      )
-      .setTimestamp();
-    await message.reply({ embeds: [embed] });
+    const { embeds, components } = await getServerInfoEmbedAndComponents(guild, 'general', author);
+    await message.reply({ embeds, components });
     return true;
   }
 

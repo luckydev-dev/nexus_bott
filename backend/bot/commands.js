@@ -351,18 +351,6 @@ export const commands = [
     ]
   },
   {
-    name: 'decensor',
-    description: 'Overrides an AutoMod message flag to restore a message or user warning.',
-    options: [
-      {
-        name: 'case_id',
-        description: 'The AutoMod warning case ID',
-        type: 3, // STRING
-        required: true
-      }
-    ]
-  },
-  {
     name: 'modlogs',
     description: 'Searches the audit database for actions executed by a specific moderator.',
     options: [
