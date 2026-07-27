@@ -66,10 +66,12 @@ export function getInitialDmDispatchEmbedAndComponents(sessionId) {
   const embed = new EmbedBuilder()
     .setTitle(`${msgIcon} Direct Message`)
     .setColor('#3B82F6')
-    .setDescription(
-      `${userIcon} **Recipient**: ${targetText}\n\n` +
-      `Select message format below:`
-    );
+    .setDescription('Select message format below:')
+    .addFields({
+      name: `${userIcon} Recipient`,
+      value: targetText,
+      inline: false
+    });
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
