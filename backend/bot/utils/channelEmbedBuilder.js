@@ -57,22 +57,39 @@ export function getChannelEmbedBuilderViewAndComponents(sessionId) {
   if (!session) return null;
 
   const { embedData } = session;
-  const prefixIcon = getCustomEmoji('nexus_prefix') || '📜';
-  const infoIcon = getCustomEmoji('nexus_info') || '📝';
-  const msgIcon = getCustomEmoji('nexus_message') || '💬';
-  const linkIcon = getCustomEmoji('nexus_link') || '🖼️';
 
   const previewEmbed = new EmbedBuilder()
-    .setTitle(`${prefixIcon} Embed Builder`)
-    .setColor(embedData.color || '#3B82F6')
-    .setDescription(
-      `${infoIcon} **Title**: ${embedData.title || '*Not set*'}\n` +
-      `${msgIcon} **Description**: ${embedData.description || '*Not set*'}\n` +
-      `${prefixIcon} **Hex Color**: \`${embedData.color || '#3B82F6'}\`\n` +
-      `${linkIcon} **Thumbnail URL**: ${embedData.thumbnail ? `\`${embedData.thumbnail}\`` : '*Not set*'}\n` +
-      `${linkIcon} **Banner Image URL**: ${embedData.image ? `\`${embedData.image}\`` : '*Not set*'}\n` +
-      `${infoIcon} **Footer**: ${embedData.footer ? `\`${embedData.footer}\`` : '*Not set*'}`
-    );
+    .setColor(embedData.color && /^#[0-9A-F]{6}$/i.test(embedData.color) ? embedData.color : '#3B82F6');
+
+  if (embedData.title && embedData.title.trim()) {
+    previewEmbed.setTitle(embedData.title.trim());
+  }
+
+  if (embedData.description && embedData.description.trim()) {
+    previewEmbed.setDescription(embedData.description.trim());
+  } else if (!embedData.title || !embedData.title.trim()) {
+    previewEmbed.setDescription('*(Embed preview — select an option below to add content)*');
+  }
+
+  if (embedData.thumbnail && embedData.thumbnail.trim().startsWith('http')) {
+    try {
+      previewEmbed.setThumbnail(embedData.thumbnail.trim());
+    } catch (e) {
+      // ignore invalid URL format
+    }
+  }
+
+  if (embedData.image && embedData.image.trim().startsWith('http')) {
+    try {
+      previewEmbed.setImage(embedData.image.trim());
+    } catch (e) {
+      // ignore invalid URL format
+    }
+  }
+
+  if (embedData.footer && embedData.footer.trim()) {
+    previewEmbed.setFooter({ text: embedData.footer.trim() });
+  }
 
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId(`chan_select_field_${sessionId}`)
