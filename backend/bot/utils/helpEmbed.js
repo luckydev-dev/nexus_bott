@@ -48,7 +48,7 @@ export function getHelpEmbedAndComponents(category = 'home', context = {}, isDis
   const authorIconUrl = user?.displayAvatarURL?.({ dynamic: true }) || client?.user?.displayAvatarURL?.() || 'https://cdn.discordapp.com/embed/avatars/0.png';
   const clientId = client?.user?.id || process.env.DISCORD_CLIENT_ID || '1528216029816426608';
   const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=2113268958&scope=bot`;
-  const supportUrl = 'https://discord.gg/8hbsvybVGs';
+  const supportUrl = 'https://discord.gg/Dz3Rgc7FKn';
 
   // Embed color matching requested reference: 16711680 (#FF0000)
   const embedColor = 16711680;
@@ -93,7 +93,7 @@ export function getHelpEmbedAndComponents(category = 'home', context = {}, isDis
       `> **Description**: ${cmdInfo.desc}\n` +
       `> **Module**: ${cmdInfo.module}\n` +
       `> **Prefix Alternative**: \`${prefix}${cmdInfo.name}\`\n\n` +
-      `-# **Need help? Contact [Support](${supportUrl}) or email us at <contact@nexusbot.io>.**`
+      `-# **Need help? Contact [Support](${supportUrl}).**`
     );
   } else if (category === 'home') {
     embed.setDescription(
@@ -108,7 +108,7 @@ export function getHelpEmbedAndComponents(category = 'home', context = {}, isDis
       `> ${getCustomEmoji('nexus_shield')} \`:\` AntiNuke Security\n` +
       `> ${getCustomEmoji('nexus_antiraid')} \`:\` Anti-Raid Defense\n` +
       `> ${getCustomEmoji('nexus_message')} \`:\` Direct Messaging & Utility\n\n` +
-      `-# **Use buttons to swap pages & menu to select help pages. Need help? Contact [Support](${supportUrl}) or email us at <contact@nexusbot.io>.**`
+      `-# **Use buttons to swap pages & menu to select help pages. Need help? Contact [Support](${supportUrl}).**`
     );
   } else if (category === 'automod') {
     embed.setDescription(

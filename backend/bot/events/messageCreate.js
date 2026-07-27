@@ -63,7 +63,7 @@ async function handlePrefixCommand(message, settings) {
   if (botMentionRegex.test(message.content.trim())) {
     const clientId = message.client.user?.id || process.env.DISCORD_CLIENT_ID || '1528216029816426608';
     const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${clientId}&permissions=2113268958&scope=bot`;
-    const supportUrl = 'https://discord.gg/8hbsvybVGs';
+    const supportUrl = 'https://discord.gg/Dz3Rgc7FKn';
     const webUrl = 'https://nexusbot.dev';
 
     const arrowIcon = getCustomEmoji('nexus_arrowright') || '➔';

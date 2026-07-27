@@ -12,7 +12,7 @@ export async function handleGuildCreate(guild) {
     ensureGuildStorage(guild.id);
     const settings = getGuildSettings(guild.id);
     const prefix = settings.prefix || '!';
-    const supportUrl = 'https://discord.gg/8hbsvybVGs';
+    const supportUrl = 'https://discord.gg/Dz3Rgc7FKn';
     const websiteUrl = 'https://nexusbot.dev';
 
     const arrowIcon = getCustomEmoji('nexus_arrowright') || '➔';

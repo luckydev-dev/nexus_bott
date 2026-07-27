@@ -5,6 +5,7 @@
 
 import { Client, GatewayIntentBits, ActivityType } from 'discord.js';
 import { commands } from './commands.js';
+import { getCustomEmojiObject, getCustomEmoji } from './utils/customEmojis.js';
 
 // Modular Event Handlers
 import handleInteraction from './events/interactionCreate.js';
@@ -61,13 +62,34 @@ export function initializeDiscordBot() {
   client.once('ready', async () => {
     console.log(`[NexusBot Gateway] Logged in as ${client.user.tag}`);
     
-    // Human-like rotating presence statuses
+    // Human-like rotating presence statuses with custom emojis
     const presenceList = [
-      { name: 'server chat & member safety 🛡️', type: ActivityType.Watching },
-      { name: '/help • /warn • /modlogs', type: ActivityType.Listening },
-      { name: 'for spam & raid attempts', type: ActivityType.Watching },
-      { name: 'Fastest Mod Action', type: ActivityType.Competing },
-      { name: 'Keeping channels clean & safe', type: ActivityType.Custom, state: 'Keeping channels clean & safe 🛡️' }
+      { 
+        name: 'custom', 
+        type: ActivityType.Custom, 
+        state: 'Keeping channels clean & safe', 
+        emoji: getCustomEmojiObject('nexus_shield') || { name: '🛡️' } 
+      },
+      { 
+        name: '/help • /automod • /antinuke', 
+        type: ActivityType.Listening 
+      },
+      { 
+        name: 'custom', 
+        type: ActivityType.Custom, 
+        state: 'Watching spam & raid attempts', 
+        emoji: getCustomEmojiObject('nexus_antiraid') || { name: '⚔️' } 
+      },
+      { 
+        name: 'Fastest Mod Action', 
+        type: ActivityType.Competing 
+      },
+      { 
+        name: 'custom', 
+        type: ActivityType.Custom, 
+        state: 'NexusBot Protection Active', 
+        emoji: getCustomEmojiObject('nexus_automod') || { name: '🛡️' } 
+      }
     ];
 
     let presenceIndex = 0;
