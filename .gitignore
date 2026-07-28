@@ -5,4 +5,19 @@ coverage/
 *.log
 .env*
 !.env.example
-!dist/
+
+# Ignored directories
+dist/
+frontend/
+
+# Ignored root configuration files (keep panel clean)
+vite.config.ts
+postcss.config.js
+tailwind.config.js
+index.html
+tsconfig.json
+bun.lock
+
+# Ensure rename folder is tracked
+!rename/
+

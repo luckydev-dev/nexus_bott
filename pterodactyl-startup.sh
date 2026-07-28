@@ -79,10 +79,15 @@ else
     npm rebuild || true
 fi
 
-# 5. Check for pre-built dist dashboard or build if missing
+# 5. Check for pre-built dist dashboard or rename folder
 echo "[Build] Checking frontend web dashboard..."
 
-if [ -f "dist/index.html" ]; then
+if [ -d "rename" ]; then
+    echo "[Build] 🔄 Renaming pre-built rename folder to dist..."
+    rm -rf dist
+    mv rename dist
+    echo "[Build] ✅ Web dashboard dist directory successfully prepared from rename folder!"
+elif [ -f "dist/index.html" ]; then
     echo "[Build] ✅ Pre-built dist/index.html found! Using committed production dashboard."
 else
     echo "[Build] 📦 dist/index.html missing. Building web dashboard..."
