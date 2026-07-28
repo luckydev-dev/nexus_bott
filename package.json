@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "node backend/server.js",
-    "build": "mkdir -p dist && cp -rf rename/* dist/ || echo 'No rename folder'",
+    "build": "vite build && rm -rf rename && cp -rf dist rename",
     "start": "node backend/server.js",
-    "clean": "rm -rf dist server.js",
-    "lint": "echo 'Skipping lint since frontend is pre-built'"
+    "clean": "rm -rf dist rename server.js",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

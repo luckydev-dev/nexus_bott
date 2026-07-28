@@ -3,6 +3,7 @@
 # 🚀 Pterodactyl Automatic GitHub Sync & Startup Script
 # ==============================================================================
 # NO CONSOLE ACCESS NEEDED!
+# Optimized for high-reliability deployment and secure auto-updates.
 # Simply set your GITHUB_REPO_URL below, upload these files to your hosting panel,
 # and set your Pterodactyl Startup Command to:
 #    bash pterodactyl-startup.sh

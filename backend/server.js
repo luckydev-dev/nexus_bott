@@ -2,6 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
+// NexusBot core Express backend routing and gateway control panel proxy
 import "dotenv/config";
 import express from "express";
 import path from "path";
