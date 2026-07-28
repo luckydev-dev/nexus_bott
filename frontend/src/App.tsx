@@ -1,3 +1,4 @@
+// nexus bot
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -46,6 +47,26 @@ function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: () =>
   );
 }
 
+const getDefaultBackendUrl = (): string => {
+  const envVal = import.meta.env.VITE_API_URL;
+  if (envVal) return envVal;
+  if (typeof window !== 'undefined' && window.location) {
+    const origin = window.location.origin;
+    if (origin) {
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        try {
+          const url = new URL(origin);
+          if (url.port && url.port !== '3000') {
+            return `${url.protocol}//${url.hostname}:3000`;
+          }
+        } catch (e) {}
+      }
+      return origin;
+    }
+  }
+  return 'http://legacy-mum1.arixbyte.com:25567';
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'dashboard'>('home');
   const [guildsList, setGuildsList] = useState<any[]>([]);
@@ -61,29 +82,13 @@ export default function App() {
   const [backendUrl, setBackendUrl] = useState<string>(() => {
     const saved = localStorage.getItem('custom_backend_url');
     if (saved) return saved;
-    const envVal = (import.meta as any).env?.VITE_API_URL;
-    if (envVal) return envVal;
-    if (typeof window !== 'undefined' && window.location) {
-      const origin = window.location.origin;
-      if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
-        return origin;
-      }
-    }
-    return 'http://legacy-mum1.arixbyte.com:25567';
+    return getDefaultBackendUrl();
   });
 
   const [tempBackendUrl, setTempBackendUrl] = useState<string>(() => {
     const saved = localStorage.getItem('custom_backend_url');
     if (saved) return saved;
-    const envVal = (import.meta as any).env?.VITE_API_URL;
-    if (envVal) return envVal;
-    if (typeof window !== 'undefined' && window.location) {
-      const origin = window.location.origin;
-      if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
-        return origin;
-      }
-    }
-    return 'http://legacy-mum1.arixbyte.com:25567';
+    return getDefaultBackendUrl();
   });
   const [revealToken, setRevealToken] = useState<boolean>(false);
   const [copiedToken, setCopiedToken] = useState<boolean>(false);
@@ -2848,7 +2853,7 @@ export default function App() {
                     type="button"
                     onClick={() => {
                       localStorage.removeItem('custom_backend_url');
-                      const defaultUrl = (import.meta as any).env?.VITE_API_URL || 'http://legacy-mum1.arixbyte.com:25567';
+                      const defaultUrl = getDefaultBackendUrl();
                       setTempBackendUrl(defaultUrl);
                       setBackendUrl(defaultUrl);
                       setConnectionTestStatus('idle');
