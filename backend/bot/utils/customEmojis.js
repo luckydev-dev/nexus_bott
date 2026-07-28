@@ -1,3 +1,4 @@
+// nexus bot
 /**
  * Custom Emojis Configuration
  */

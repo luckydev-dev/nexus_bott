@@ -1,3 +1,4 @@
+<!-- nexus bot -->
 # 🎮 Zero-Console Pterodactyl GitHub Auto-Sync Setup
 
 Since your hosting panel does not allow console access, you can set everything up simply by editing files in your **File Manager** and updating your **Startup Command**!
