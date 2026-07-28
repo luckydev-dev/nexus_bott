@@ -2,7 +2,6 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-// NexusBot core Express backend routing and gateway control panel proxy
 import "dotenv/config";
 import express from "express";
 import path from "path";
@@ -556,10 +555,7 @@ async function startServer() {
       res.status(500).json({ success: false, error: err.message });
     }
   });
-  let distPath = path.join(process.cwd(), "dist");
-  if (!fs.existsSync(distPath) && fs.existsSync(path.join(process.cwd(), "rename"))) {
-    distPath = path.join(process.cwd(), "rename");
-  }
+  const distPath = path.join(process.cwd(), "dist");
   const indexPath = path.join(distPath, "index.html");
 
   if (process.env.NODE_ENV === "production") {
