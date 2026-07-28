@@ -79,46 +79,22 @@ else
     npm rebuild || true
 fi
 
-# 5. Build frontend web dashboard with change detection & auto-healing recovery
-echo "[Build] Checking frontend web dashboard build..."
+# 5. Check for pre-built dist dashboard or build if missing
+echo "[Build] Checking frontend web dashboard..."
 
-get_frontend_hash() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        find src frontend index.html vite.config.ts tailwind.config.js postcss.config.js package.json -type f 2>/dev/null | sort | xargs sha256sum 2>/dev/null | sha256sum | awk '{print $1}'
-    elif command -v md5sum >/dev/null 2>&1; then
-        find src frontend index.html vite.config.ts tailwind.config.js postcss.config.js package.json -type f 2>/dev/null | sort | xargs md5sum 2>/dev/null | md5sum | awk '{print $1}'
-    else
-        find src frontend index.html vite.config.ts tailwind.config.js postcss.config.js package.json -type f 2>/dev/null | sort | xargs cksum 2>/dev/null | cksum | awk '{print $1}'
-    fi
-}
-
-CURRENT_FRONTEND_HASH=$(get_frontend_hash)
-LAST_BUILD_HASH=""
-if [ -f "dist/.build_hash" ]; then
-    LAST_BUILD_HASH=$(cat "dist/.build_hash" 2>/dev/null)
-fi
-
-if [ -f "dist/index.html" ] && [ -n "$CURRENT_FRONTEND_HASH" ] && [ "$CURRENT_FRONTEND_HASH" = "$LAST_BUILD_HASH" ]; then
-    echo "[Build] ✅ Frontend files unchanged and dist/index.html is up to date. Skipping build!"
+if [ -f "dist/index.html" ]; then
+    echo "[Build] ✅ Pre-built dist/index.html found! Using committed production dashboard."
 else
-    if [ -f "dist/index.html" ]; then
-        echo "[Build] 🔄 Frontend source code changes detected. Rebuilding web dashboard..."
-    else
-        echo "[Build] 📦 dist/index.html missing. Building web dashboard..."
-    fi
-
+    echo "[Build] 📦 dist/index.html missing. Building web dashboard..."
     if npm run build && [ -f "dist/index.html" ]; then
-        echo "$CURRENT_FRONTEND_HASH" > "dist/.build_hash" 2>/dev/null || true
         echo "[Build] ✅ Frontend build completed successfully!"
     else
-        echo "[Build Warning] Build failed or dist/index.html missing. Ensuring @rollup/wasm-node compatibility package..."
+        echo "[Build Warning] Frontend build failed or @rollup native binary incompatible. Attempting @rollup/wasm-node fallback..."
         npm install --no-audit --no-fund @rollup/wasm-node || true
-        echo "[Build] Retrying web dashboard build..."
         if npm run build && [ -f "dist/index.html" ]; then
-            echo "$CURRENT_FRONTEND_HASH" > "dist/.build_hash" 2>/dev/null || true
-            echo "[Build] ✅ Frontend build completed successfully after WASM fallback setup!"
+            echo "[Build] ✅ Frontend build completed successfully with WASM fallback!"
         else
-            echo "[Build Warning] Frontend build encountered an issue, continuing startup..."
+            echo "[Build Warning] Could not compile frontend, proceeding if server has fallback..."
         fi
     fi
 fi
