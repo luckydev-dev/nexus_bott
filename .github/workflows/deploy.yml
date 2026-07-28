@@ -1,0 +1,50 @@
+name: Deploy to Pterodactyl
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies & Build Frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Sync Files to Pterodactyl via SFTP
+        uses: SamKirsch/pterodactyl-action@v1
+        with:
+          host: ${{ secrets.PTERODACTYL_URL }}
+          client_api_key: ${{ secrets.PTERODACTYL_API_KEY }}
+          server_id: ${{ secrets.PTERODACTYL_SERVER_ID }}
+          restart: true
+        continue-on-error: true
+
+      - name: Fallback: Trigger Pterodactyl Server Restart API
+        if: env.PTERODACTYL_SERVER_ID != ''
+        env:
+          PANEL_URL: ${{ secrets.PTERODACTYL_URL }}
+          API_KEY: ${{ secrets.PTERODACTYL_API_KEY }}
+          SERVER_ID: ${{ secrets.PTERODACTYL_SERVER_ID }}
+        run: |
+          if [ -n "$PANEL_URL" ] && [ -n "$API_KEY" ] && [ -n "$SERVER_ID" ]; then
+            echo "Sending restart signal to Pterodactyl server..."
+            curl -X POST "$PANEL_URL/api/client/servers/$SERVER_ID/power" \
+              -H "Authorization: Bearer $API_KEY" \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json" \
+              -d '{"signal": "restart"}'
+          fi
