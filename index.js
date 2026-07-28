@@ -12,10 +12,16 @@ if (!existsSync('pterodactyl-startup.sh')) {
 }
 
 // Spawn bash to run pterodactyl-startup.sh
+const env = {
+  ...process.env,
+  HOME: process.cwd(),
+  npm_config_cache: `${process.cwd()}/.npm-cache`
+};
+
 const child = spawn('bash', ['pterodactyl-startup.sh'], {
   stdio: 'inherit',
   shell: true,
-  env: { ...process.env }
+  env
 });
 
 child.on('close', (code) => {

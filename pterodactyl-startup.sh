@@ -12,6 +12,10 @@
 # Example: GITHUB_REPO_URL="https://github.com/your-username/your-repo.git"
 GITHUB_REPO_URL="https://github.com/luckydev-dev/nexus_bott.git"
 
+# Override HOME and npm_config_cache to the current directory to avoid ENOENT/permission errors on home directory
+export HOME="$(pwd)"
+export npm_config_cache="$(pwd)/.npm-cache"
+
 echo "=========================================="
 echo "   NexusBot Zero-Console GitHub Sync     "
 echo "=========================================="
@@ -88,12 +92,12 @@ fi
 
 # 4. Install / Verify Node dependencies (skipping devDependencies to save space)
 # Clean up any residual cache files first to free up as much space as possible
-rm -rf .npm ~/.npm /tmp/npm-cache 2>/dev/null || true
+rm -rf .npm ~/.npm /tmp/npm-cache .npm-cache 2>/dev/null || true
 
 if [ ! -d "node_modules" ]; then
     echo "[Node] node_modules not found. Installing production dependencies..."
-    npm install --omit=dev --no-audit --no-fund --cache=/tmp/npm-cache || npm install --production --no-audit --no-fund --cache=/tmp/npm-cache
-    rm -rf /tmp/npm-cache ~/.npm 2>/dev/null || true
+    npm install --omit=dev --no-audit --no-fund || npm install --production --no-audit --no-fund
+    rm -rf .npm-cache .npm ~/.npm /tmp/npm-cache 2>/dev/null || true
 else
     echo "[Node] node_modules found. Ensuring native bindings are rebuilt..."
     npm rebuild || true
