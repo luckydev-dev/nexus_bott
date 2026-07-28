@@ -1,4 +1,3 @@
-<!-- nexus bot -->
 # NexusBot Deployment & Hosting Guide
 
 This project is fully divided into two standalone, production-ready modules designed for separate hosting environments:
