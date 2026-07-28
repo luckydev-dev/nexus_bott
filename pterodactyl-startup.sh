@@ -16,28 +16,30 @@ echo "=========================================="
 echo "   NexusBot Zero-Console GitHub Sync     "
 echo "=========================================="
 
-# 1. Initialize Git repository if not present
-if [ ! -d ".git" ]; then
-    echo "[Git] Initializing git repository..."
-    git init
-    git config user.name "Pterodactyl Host"
-    git config user.email "bot@pterodactyl.local"
+# 1. Initialize Git repository if not present, handling corruption gracefully
+if [ ! -d ".git" ] || ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "[Git] Initializing or recovering git repository..."
+    rm -rf .git
+    git init || echo "[Git Warning] git init failed (no disk space left?)"
+    git config user.name "Pterodactyl Host" 2>/dev/null || true
+    git config user.email "bot@pterodactyl.local" 2>/dev/null || true
 fi
 
 # 2. Configure remote origin from variable if provided
 if [ -n "$GITHUB_REPO_URL" ]; then
     echo "[Git] Setting repository origin to: $GITHUB_REPO_URL"
-    if git remote | grep -q "origin"; then
-        git remote set-url origin "$GITHUB_REPO_URL"
+    if git remote | grep -q "origin" 2>/dev/null; then
+        git remote set-url origin "$GITHUB_REPO_URL" 2>/dev/null || true
     else
-        git remote add origin "$GITHUB_REPO_URL"
+        git remote add origin "$GITHUB_REPO_URL" 2>/dev/null || true
     fi
 fi
 
-# 3. Pull latest changes from GitHub automatically
-if git remote | grep -q "origin"; then
-    echo "[Git] Pulling latest code updates from GitHub..."
-    git fetch origin --tags || git fetch --all || true
+# 3. Pull latest changes from GitHub automatically using shallow depth to conserve disk space
+if git remote | grep -q "origin" 2>/dev/null; then
+    echo "[Git] Fetching latest updates with shallow depth..."
+    # Shallow fetch with depth 1 saves massive amounts of hosting storage
+    git fetch origin --depth=1 --tags 2>/dev/null || git fetch origin --depth=1 2>/dev/null || true
 
     # Detect active remote branch (main or master)
     TARGET_BRANCH=""
@@ -48,10 +50,11 @@ if git remote | grep -q "origin"; then
     fi
 
     if [ -n "$TARGET_BRANCH" ]; then
-        echo "[Git] Checking out remote branch '$TARGET_BRANCH'..."
-        git checkout -f -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH" || true
-        git reset --hard "origin/$TARGET_BRANCH" || true
-        git pull origin "$TARGET_BRANCH" --rebase || git pull origin "$TARGET_BRANCH" || true
+        echo "[Git] Syncing remote branch '$TARGET_BRANCH' (shallow checkout)..."
+        git checkout -f -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH" 2>/dev/null || true
+        git reset --hard "origin/$TARGET_BRANCH" 2>/dev/null || true
+        # Clean untracked files to keep things compact, keeping dist, rename, and local settings/env intact
+        git clean -fd -e rename -e dist -e data -e .env 2>/dev/null || true
         echo "[Git] ✅ Repository successfully updated from GitHub ($TARGET_BRANCH)!"
     else
         echo "[Git] ⚠️ Notice: Neither origin/main nor origin/master was found on remote."
@@ -70,10 +73,13 @@ if [ ! -f "package.json" ]; then
     fi
 fi
 
-# 4. Install / Verify Node dependencies
+# 4. Install / Verify Node dependencies (skipping devDependencies to save space)
+# Clean up any residual cache files first to free up as much space as possible
+rm -rf .npm ~/.npm 2>/dev/null || true
+
 if [ ! -d "node_modules" ]; then
-    echo "[Node] node_modules not found. Installing npm dependencies..."
-    npm install --no-audit --no-fund
+    echo "[Node] node_modules not found. Installing production dependencies..."
+    npm install --omit=dev --no-audit --no-fund || npm install --production --no-audit --no-fund
 else
     echo "[Node] node_modules found. Ensuring native bindings are rebuilt..."
     npm rebuild || true
