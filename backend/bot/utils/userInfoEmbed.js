@@ -8,147 +8,160 @@ import { getCustomEmoji, getCustomEmojiObject } from './customEmojis.js';
 import fs from 'fs';
 import path from 'path';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_DIR = path.join(process.cwd(), 'data', 'guilds');
 
 /**
- * Builds the interactive /userinfo embed and category select menu.
+ * Helper to get custom emoji string without fallback unicode emojis
+ */
+function emoji(key) {
+  const e = getCustomEmoji(key);
+  return (e && !e.startsWith(':')) ? e : '';
+}
+
+/**
+ * Builds the interactive /userinfo embed and select menu.
  * @param {import('discord.js').Guild} guild 
  * @param {import('discord.js').User} targetUser 
- * @param {string} category - 'general', 'stats', 'roles', or 'avatar'
- * @param {import('discord.js').User} requester 
+ * @param {string} category - 'general', 'roles', or 'avatar'
+ * @param {import('discord.js').User} requestingUser 
  */
-export async function getUserInfoEmbedAndComponents(guild, targetUser, category = 'general', requester = null) {
-  const member = await guild.members.fetch(targetUser.id).catch(() => null);
-
+export async function getUserInfoEmbedAndComponents(guild, targetUser, category = 'general', requestingUser = null) {
   const embed = new EmbedBuilder().setColor('#27272f');
 
-  const avatarUrl = targetUser.displayAvatarURL({ dynamic: true, size: 1024 });
-  const avatarThumbnail = targetUser.displayAvatarURL({ dynamic: true, size: 256 });
+  if (targetUser.displayAvatarURL()) {
+    embed.setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 256 }));
+  }
 
-  const pad = (n) => String(n).padStart(2, '0');
-  const createdDate = targetUser.createdAt;
-  const createdDateStr = `${createdDate.getUTCFullYear()}-${pad(createdDate.getUTCMonth() + 1)}-${pad(createdDate.getUTCDate())} ${pad(createdDate.getUTCHours())}:${pad(createdDate.getUTCMinutes())}:${pad(createdDate.getUTCSeconds())}`;
+  const member = await guild.members.fetch(targetUser.id).catch(() => null);
 
-  const requestedBy = requester ? requester.username || requester.tag : targetUser.username;
+  // Fetch warnings
+  let userWarnsCount = 0;
+  try {
+    const warningsPath = path.join(DATA_DIR, guild.id, 'warnings.json');
+    if (fs.existsSync(warningsPath)) {
+      const warnings = JSON.parse(fs.readFileSync(warningsPath, 'utf8'));
+      userWarnsCount = warnings.filter(w => w.memberId === targetUser.id && w.active !== false).length;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  const joinedAtStr = member?.joinedAt ? `<t:${Math.floor(member.joinedAt.getTime() / 1000)}:R>` : 'Unknown';
+  const createdAtStr = `<t:${Math.floor(targetUser.createdAt.getTime() / 1000)}:R>`;
+  const isTimedOut = member?.isCommunicationDisabled?.();
+  const timeoutUntil = isTimedOut ? `<t:${Math.floor(member.communicationDisabledUntil.getTime() / 1000)}:R>` : 'None';
+
+  // Format timestamp for footer: "Requested by username | Today at HH:MM PM"
+  const requestedBy = requestingUser ? requestingUser.username || requestingUser.tag : 'User';
   const now = new Date();
   const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   embed.setFooter({ text: `Requested by ${requestedBy} | Today at ${timeStr}` });
 
-  const userIcon = getCustomEmoji('nexus_user') || '👤';
-  const idIcon = getCustomEmoji('nexus_ID') || '🆔';
-  const dateIcon = getCustomEmoji('nexus_date') || '📅';
-  const rolesIcon = getCustomEmoji('nexus_roles') || '🎭';
-  const shieldIcon = getCustomEmoji('nexus_shield') || '🛡️';
-  const linkIcon = getCustomEmoji('nexus_link') || '🖼️';
-  const statsIcon = getCustomEmoji('nexus_stats') || '📊';
+  const userIcon = emoji('nexus_user');
+  const idIcon = emoji('nexus_ID');
+  const dateIcon = emoji('nexus_date');
+  const joinIcon = emoji('nexus_join');
+  const rolesIcon = emoji('nexus_roles');
+  const shieldIcon = emoji('nexus_shield');
+  const warnIcon = emoji('nexus_warning');
+  const linkIcon = emoji('nexus_link');
+  const adminIcon = emoji('nexus_admin');
 
-  if (category === 'stats') {
-    embed.setThumbnail(avatarThumbnail);
-    embed.setTitle(`${shieldIcon} Member Stats — ${targetUser.username}`);
+  const p = (e) => e ? `${e} ` : '';
 
-    let userWarns = [];
-    if (guild) {
-      const warningsPath = path.join(DATA_DIR, guild.id, 'warnings.json');
-      try {
-        const raw = fs.readFileSync(warningsPath, 'utf8');
-        const warnings = JSON.parse(raw);
-        userWarns = warnings.filter(w => w.memberId === targetUser.id && w.active !== false);
-      } catch (e) {}
-    }
-
-    const isTimedOut = member?.isCommunicationDisabled?.();
-    const timeoutUntil = isTimedOut ? `<t:${Math.floor(member.communicationDisabledUntil.getTime() / 1000)}:R>` : 'None';
-    const nickname = member?.nickname ? member.nickname : 'None';
-    const booster = member?.premiumSince ? `💖 Since <t:${Math.floor(member.premiumSince.getTime() / 1000)}:R>` : 'No Boost';
-    const ruleScreening = member?.pending ? '⚠️ Pending' : '✅ Passed';
-
-    embed.addFields(
-      { name: `${userIcon} Server Nickname`, value: nickname, inline: true },
-      { name: `${shieldIcon} Active Warnings`, value: `\`${userWarns.length}\``, inline: true },
-      { name: `${statsIcon} Timeout Status`, value: isTimedOut ? `⏳ Muted until ${timeoutUntil}` : '✅ Normal', inline: true },
-      { name: `${dateIcon} Server Booster`, value: booster, inline: true },
-      { name: `${shieldIcon} Rule Screening`, value: ruleScreening, inline: true }
-    );
-  } else if (category === 'roles') {
-    embed.setThumbnail(avatarThumbnail);
-    const sortedRoles = member?.roles?.cache
-      ?.filter(r => r.name !== '@everyone')
-      ?.sort((a, b) => b.position - a.position)
-      ?.map(r => `<@&${r.id}>`) || [];
-
-    embed.setTitle(`${rolesIcon} Roles [${sortedRoles.length}] — ${targetUser.username}`);
-
-    if (sortedRoles.length > 0) {
-      let roleText = sortedRoles.join(', ');
-      if (roleText.length > 1024) {
-        roleText = roleText.substring(0, 1000) + '... and more';
-      }
-      embed.addFields({ name: `${rolesIcon} Assigned Roles`, value: roleText, inline: false });
-    } else {
-      embed.addFields({ name: `${rolesIcon} Assigned Roles`, value: 'No roles assigned', inline: false });
-    }
-  } else if (category === 'avatar') {
-    embed.setTitle(`${linkIcon} User Icon / Avatar — ${targetUser.username}`);
+  if (category === 'avatar') {
+    embed.setTitle(`${p(userIcon)}Avatar - ${targetUser.username}`);
+    const avatarUrl = targetUser.displayAvatarURL({ dynamic: true, size: 1024 });
     embed.setImage(avatarUrl);
 
-    const png = targetUser.displayAvatarURL({ format: 'png', size: 1024 });
-    const jpg = targetUser.displayAvatarURL({ format: 'jpg', size: 1024 });
-    const webp = targetUser.displayAvatarURL({ format: 'webp', size: 1024 });
+    const png = targetUser.displayAvatarURL({ extension: 'png', size: 1024 });
+    const jpg = targetUser.displayAvatarURL({ extension: 'jpg', size: 1024 });
+    const webp = targetUser.displayAvatarURL({ extension: 'webp', size: 1024 });
+    const isAnimated = targetUser.avatar?.startsWith('a_');
+    const gif = isAnimated ? targetUser.displayAvatarURL({ extension: 'gif', size: 1024 }) : null;
 
-    embed.addFields({
-      name: `${linkIcon} Download Avatar Links`,
-      value: `[PNG](${png}) | [JPG](${jpg}) | [WEBP](${webp})`,
-      inline: false
-    });
-  } else {
-    // Default: 'general'
-    embed.setThumbnail(avatarThumbnail);
-    embed.setTitle(`${userIcon} General Info — ${targetUser.username}`);
+    let links = `${p(linkIcon)}[PNG](${png}) | [JPG](${jpg}) | [WEBP](${webp})`;
+    if (gif) links += ` | [GIF](${gif})`;
 
-    const createdAtTs = `<t:${Math.floor(targetUser.createdAt.getTime() / 1000)}:R>`;
-    const joinedAtTs = member?.joinedAt ? `<t:${Math.floor(member.joinedAt.getTime() / 1000)}:R>` : 'Not in server';
+    embed.setDescription(links);
+  } else if (category === 'roles') {
+    embed.setTitle(`${p(rolesIcon)}Roles & Permissions - ${targetUser.username}`);
+
+    const sortedRoles = member?.roles?.cache
+      ?.filter(r => r.name !== '@everyone')
+      ?.sort((a, b) => b.position - a.position);
+
+    const rolesList = sortedRoles && sortedRoles.size > 0
+      ? sortedRoles.map(r => `<@&${r.id}>`).join(', ')
+      : 'No roles assigned';
+
     const topRole = member?.roles?.highest ? `<@&${member.roles.highest.id}>` : 'None';
 
+    embed.setDescription(
+      `${p(rolesIcon)}**Top Role**: ${topRole}\n\n` +
+      `${p(rolesIcon)}**Roles List**: ${rolesList}`
+    );
+
+    // Key permissions
+    if (member) {
+      const perms = [];
+      if (member.permissions.has('Administrator')) perms.push('Administrator');
+      if (member.permissions.has('ManageGuild')) perms.push('Manage Server');
+      if (member.permissions.has('ManageRoles')) perms.push('Manage Roles');
+      if (member.permissions.has('ManageChannels')) perms.push('Manage Channels');
+      if (member.permissions.has('KickMembers')) perms.push('Kick Members');
+      if (member.permissions.has('BanMembers')) perms.push('Ban Members');
+      if (member.permissions.has('ManageMessages')) perms.push('Manage Messages');
+
+      const permStr = perms.length > 0 ? perms.join(', ') : 'Standard Permissions';
+      embed.addFields({ name: `${p(adminIcon)}Key Permissions`, value: permStr, inline: false });
+    }
+  } else {
+    // Default / 'general'
+    embed.setTitle(`${p(userIcon)}Member Profile - ${targetUser.username}`);
+
+    embed.setDescription(
+      `${p(userIcon)}**User**: <@${targetUser.id}> (${targetUser.tag || targetUser.username})\n` +
+      `${p(shieldIcon)}**Bot Account**: ${targetUser.bot ? 'Yes' : 'No'}`
+    );
+
     embed.addFields(
-      { name: `${userIcon} User Tag`, value: `${targetUser.username}`, inline: true },
-      { name: `${idIcon} User ID`, value: `\`${targetUser.id}\``, inline: true },
-      { name: `${userIcon} Bot Account`, value: targetUser.bot ? '🤖 Yes' : '👤 No', inline: true },
-      { name: `${dateIcon} Account Created`, value: `${createdDateStr}\n(${createdAtTs})`, inline: true },
-      { name: `${dateIcon} Joined Server`, value: joinedAtTs, inline: true },
-      { name: `${rolesIcon} Top Role`, value: topRole, inline: true }
+      { name: `${p(idIcon)}User ID`, value: `\`${targetUser.id}\``, inline: true },
+      { name: `${p(dateIcon)}Account Created`, value: createdAtStr, inline: true },
+      { name: `${p(joinIcon)}Joined Server`, value: joinedAtStr, inline: true },
+      { name: `${p(warnIcon)}Active Warnings`, value: `\`${userWarnsCount}\``, inline: true },
+      { name: `${p(shieldIcon)}Timeout Status`, value: isTimedOut ? `Muted until ${timeoutUntil}` : 'Active', inline: true }
     );
   }
 
-  // Category select menu
+  // Select menu
+  const menuOptions = [
+    {
+      label: 'General Info',
+      value: `userinfo_general_${targetUser.id}`
+    },
+    {
+      label: 'Roles & Permissions',
+      value: `userinfo_roles_${targetUser.id}`
+    },
+    {
+      label: 'Avatar',
+      value: `userinfo_avatar_${targetUser.id}`
+    }
+  ];
+
+  const userEmojiObj = getCustomEmojiObject('nexus_user');
+  const rolesEmojiObj = getCustomEmojiObject('nexus_roles');
+  const linkEmojiObj = getCustomEmojiObject('nexus_link');
+
+  if (userEmojiObj) menuOptions[0].emoji = userEmojiObj;
+  if (rolesEmojiObj) menuOptions[1].emoji = rolesEmojiObj;
+  if (linkEmojiObj) menuOptions[2].emoji = linkEmojiObj;
+
   const menu = new StringSelectMenuBuilder()
     .setCustomId(`userinfo_category_select_${targetUser.id}`)
-    .setPlaceholder('Select user info category...')
-    .addOptions([
-      {
-        label: 'General Info',
-        value: 'userinfo_general',
-        description: 'View user profile & creation details',
-        emoji: getCustomEmojiObject('nexus_user') || { name: '👤' }
-      },
-      {
-        label: 'Member Stats',
-        value: 'userinfo_stats',
-        description: 'View warnings, timeout & server status',
-        emoji: getCustomEmojiObject('nexus_stats') || { name: '📊' }
-      },
-      {
-        label: 'Roles',
-        value: 'userinfo_roles',
-        description: 'View assigned server roles',
-        emoji: getCustomEmojiObject('nexus_roles') || { name: '🎭' }
-      },
-      {
-        label: 'User Icon / Avatar',
-        value: 'userinfo_avatar',
-        description: 'View full size user avatar image & links',
-        emoji: getCustomEmojiObject('nexus_link') || { name: '🖼️' }
-      }
-    ]);
+    .setPlaceholder('Select user info category')
+    .addOptions(menuOptions);
 
   const row = new ActionRowBuilder().addComponents(menu);
 

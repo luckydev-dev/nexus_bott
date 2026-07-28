@@ -107,12 +107,12 @@ async function handlePrefixCommand(message, settings) {
   const author = message.author;
   const member = message.member;
 
-  const successIcon = statusEmoji('success') || getEmoji('nexus_success') || '✅';
-  const errorIcon = statusEmoji('error') || getEmoji('nexus_error') || '❌';
-  const shieldIcon = statusEmoji('automod') || getEmoji('nexus_automod') || '🛡️';
-  const lockIcon = statusEmoji('lock') || getEmoji('nexus_lock') || '🔒';
-  const banIcon = statusEmoji('ban') || getEmoji('nexus_ban') || '🔨';
-  const userIcon = getEmoji('nexus_member') || '👤';
+  const successIcon = statusEmoji('success') || getEmoji('nexus_tick');
+  const errorIcon = statusEmoji('error') || getEmoji('nexus_cross');
+  const shieldIcon = statusEmoji('automod') || getEmoji('nexus_automod');
+  const lockIcon = statusEmoji('lock') || getEmoji('nexus_lock');
+  const banIcon = statusEmoji('ban') || getEmoji('nexus_shield');
+  const userIcon = getEmoji('nexus_user');
 
   // Command 1: extractembed / embedjson
   if (['extractembed', 'extract-embed', 'embedjson'].includes(command)) {
@@ -165,7 +165,7 @@ async function handlePrefixCommand(message, settings) {
   if (command === 'ping') {
     const embed = new EmbedBuilder()
       .setColor('#3B82F6')
-      .setDescription(`🏓 **Pong!**\nLatency: \`${Date.now() - message.createdTimestamp}ms\` | WebSocket Ping: \`${Math.round(message.client.ws.ping)}ms\``);
+      .setDescription(`${getEmoji('nexus_stats')} **Pong!**\nLatency: \`${Date.now() - message.createdTimestamp}ms\` | WebSocket Ping: \`${Math.round(message.client.ws.ping)}ms\``);
     await message.reply({ embeds: [embed] });
     return true;
   }
@@ -738,9 +738,25 @@ async function handlePrefixCommand(message, settings) {
     return true;
   }
 
+  // Avatar command
+  if (['avatar', 'av', 'pfp'].includes(command)) {
+    const targetMember = (await parseMember(guild, args[0])) || member;
+    const targetUser = targetMember.user;
+    const { embeds, components } = await getUserInfoEmbedAndComponents(guild, targetUser, 'avatar', author);
+    await message.reply({ embeds, components });
+    return true;
+  }
+
   // Command 22: serverinfo
   if (['serverinfo', 'server'].includes(command)) {
     const { embeds, components } = await getServerInfoEmbedAndComponents(guild, 'general', author);
+    await message.reply({ embeds, components });
+    return true;
+  }
+
+  // Servericon command
+  if (['servericon', 'icon'].includes(command)) {
+    const { embeds, components } = await getServerInfoEmbedAndComponents(guild, 'icon', author);
     await message.reply({ embeds, components });
     return true;
   }

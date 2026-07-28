@@ -60,8 +60,8 @@ export function getInitialDmDispatchEmbedAndComponents(sessionId) {
     ? `<@${session.targetUser.id}> (**${session.targetUser.tag || session.targetUser.username}**)`
     : (session?.targetRole ? `<@&${session.targetRole.id}>` : 'Entire Server');
 
-  const msgIcon = getCustomEmoji('nexus_message') || '✉️';
-  const userIcon = getCustomEmoji('nexus_user') || '👤';
+  const msgIcon = getCustomEmoji('nexus_message');
+  const userIcon = getCustomEmoji('nexus_user');
 
   const embed = new EmbedBuilder()
     .setTitle(`${msgIcon} Direct Message`)
@@ -73,23 +73,30 @@ export function getInitialDmDispatchEmbedAndComponents(sessionId) {
       inline: false
     });
 
-  const row = new ActionRowBuilder().addComponents(
+  const rowComponents = [
     new ButtonBuilder()
       .setCustomId(`dm_btn_simple_${sessionId}`)
       .setLabel('Simple')
-      .setEmoji(getCustomEmojiObject('nexus_message') || { name: '💬' })
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(`dm_btn_embed_${sessionId}`)
       .setLabel('Embed')
-      .setEmoji(getCustomEmojiObject('nexus_prefix') || { name: '📜' })
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(`dm_btn_cancel_${sessionId}`)
       .setLabel('Cancel')
-      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '❌' })
       .setStyle(ButtonStyle.Danger)
-  );
+  ];
+
+  const msgEmojiObj = getCustomEmojiObject('nexus_message');
+  const prefixEmojiObj = getCustomEmojiObject('nexus_prefix');
+  const crossEmojiObj = getCustomEmojiObject('nexus_cross');
+
+  if (msgEmojiObj) rowComponents[0].setEmoji(msgEmojiObj);
+  if (prefixEmojiObj) rowComponents[1].setEmoji(prefixEmojiObj);
+  if (crossEmojiObj) rowComponents[2].setEmoji(crossEmojiObj);
+
+  const row = new ActionRowBuilder().addComponents(rowComponents);
 
   return { embeds: [embed], components: [row] };
 }
@@ -136,62 +143,75 @@ export function getEmbedBuilderViewAndComponents(sessionId) {
     previewEmbed.setFooter({ text: embedData.footer.trim() });
   }
 
+  const selectMenuOptions = [
+    {
+      label: 'Edit Title',
+      value: 'title',
+      description: 'Set custom title for the embed'
+    },
+    {
+      label: 'Edit Description',
+      value: 'description',
+      description: 'Set message body description'
+    },
+    {
+      label: 'Edit Color',
+      value: 'color',
+      description: 'Set hex color code (e.g. #3B82F6)'
+    },
+    {
+      label: 'Edit Thumbnail',
+      value: 'thumbnail',
+      description: 'Set thumbnail image URL'
+    },
+    {
+      label: 'Edit Banner Image',
+      value: 'image',
+      description: 'Set banner image URL'
+    },
+    {
+      label: 'Edit Footer',
+      value: 'footer',
+      description: 'Set footer text'
+    }
+  ];
+
+  const infoEmojiObj = getCustomEmojiObject('nexus_info');
+  const msgEmojiObj = getCustomEmojiObject('nexus_message');
+  const settingsEmojiObj = getCustomEmojiObject('nexus_settings') || getCustomEmojiObject('nexus_prefix');
+  const linkEmojiObj = getCustomEmojiObject('nexus_link');
+
+  if (infoEmojiObj) selectMenuOptions[0].emoji = infoEmojiObj;
+  if (msgEmojiObj) selectMenuOptions[1].emoji = msgEmojiObj;
+  if (settingsEmojiObj) selectMenuOptions[2].emoji = settingsEmojiObj;
+  if (linkEmojiObj) selectMenuOptions[3].emoji = linkEmojiObj;
+  if (linkEmojiObj) selectMenuOptions[4].emoji = linkEmojiObj;
+  if (infoEmojiObj) selectMenuOptions[5].emoji = infoEmojiObj;
+
   const selectMenu = new StringSelectMenuBuilder()
     .setCustomId(`dm_select_field_${sessionId}`)
     .setPlaceholder('Select field to edit...')
-    .addOptions([
-      {
-        label: 'Edit Title',
-        value: 'title',
-        description: 'Set custom title for the embed',
-        emoji: getCustomEmojiObject('nexus_info') || { name: '📝' }
-      },
-      {
-        label: 'Edit Description',
-        value: 'description',
-        description: 'Set message body description',
-        emoji: getCustomEmojiObject('nexus_message') || { name: '💬' }
-      },
-      {
-        label: 'Edit Color',
-        value: 'color',
-        description: 'Set hex color code (e.g. #3B82F6)',
-        emoji: getCustomEmojiObject('nexus_prefix') || getCustomEmojiObject('nexus_settings') || { name: '🎨' }
-      },
-      {
-        label: 'Edit Thumbnail',
-        value: 'thumbnail',
-        description: 'Set thumbnail image URL',
-        emoji: getCustomEmojiObject('nexus_link') || { name: '🖼️' }
-      },
-      {
-        label: 'Edit Banner Image',
-        value: 'image',
-        description: 'Set banner image URL',
-        emoji: getCustomEmojiObject('nexus_link') || { name: '🖼️' }
-      },
-      {
-        label: 'Edit Footer',
-        value: 'footer',
-        description: 'Set footer text',
-        emoji: getCustomEmojiObject('nexus_info') || { name: '📑' }
-      }
-    ]);
+    .addOptions(selectMenuOptions);
 
   const rowSelect = new ActionRowBuilder().addComponents(selectMenu);
 
-  const rowButtons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`dm_btn_send_embed_${sessionId}`)
-      .setLabel('Send DM')
-      .setEmoji(getCustomEmojiObject('nexus_tick') || { name: '✅' })
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId(`dm_btn_cancel_${sessionId}`)
-      .setLabel('Cancel')
-      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '❌' })
-      .setStyle(ButtonStyle.Danger)
-  );
+  const btnSend = new ButtonBuilder()
+    .setCustomId(`dm_btn_send_embed_${sessionId}`)
+    .setLabel('Send DM')
+    .setStyle(ButtonStyle.Success);
+
+  const btnCancel = new ButtonBuilder()
+    .setCustomId(`dm_btn_cancel_${sessionId}`)
+    .setLabel('Cancel')
+    .setStyle(ButtonStyle.Danger);
+
+  const tickEmojiObj = getCustomEmojiObject('nexus_tick');
+  const crossEmojiObj = getCustomEmojiObject('nexus_cross');
+
+  if (tickEmojiObj) btnSend.setEmoji(tickEmojiObj);
+  if (crossEmojiObj) btnCancel.setEmoji(crossEmojiObj);
+
+  const rowButtons = new ActionRowBuilder().addComponents(btnSend, btnCancel);
 
   return { embeds: [previewEmbed], components: [rowSelect, rowButtons] };
 }
