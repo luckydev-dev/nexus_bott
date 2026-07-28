@@ -555,7 +555,10 @@ async function startServer() {
       res.status(500).json({ success: false, error: err.message });
     }
   });
-  const distPath = path.join(process.cwd(), "dist");
+  let distPath = path.join(process.cwd(), "dist");
+  if (!fs.existsSync(distPath) && fs.existsSync(path.join(process.cwd(), "rename"))) {
+    distPath = path.join(process.cwd(), "rename");
+  }
   const indexPath = path.join(distPath, "index.html");
 
   if (process.env.NODE_ENV === "production") {
