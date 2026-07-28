@@ -111,13 +111,12 @@ else
         echo "$CURRENT_FRONTEND_HASH" > "dist/.build_hash" 2>/dev/null || true
         echo "[Build] ✅ Frontend build completed successfully!"
     else
-        echo "[Build Warning] Build failed or dist/index.html missing. Re-installing dependencies..."
-        rm -rf node_modules package-lock.json
-        npm install --no-audit --no-fund
+        echo "[Build Warning] Build failed or dist/index.html missing. Ensuring @rollup/wasm-node compatibility package..."
+        npm install --no-audit --no-fund @rollup/wasm-node || true
         echo "[Build] Retrying web dashboard build..."
         if npm run build && [ -f "dist/index.html" ]; then
             echo "$CURRENT_FRONTEND_HASH" > "dist/.build_hash" 2>/dev/null || true
-            echo "[Build] ✅ Frontend build completed successfully after dependency refresh!"
+            echo "[Build] ✅ Frontend build completed successfully after WASM fallback setup!"
         else
             echo "[Build Warning] Frontend build encountered an issue, continuing startup..."
         fi
