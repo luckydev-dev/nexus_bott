@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node backend/server.js",
     "build": "mkdir -p dist && cp -rf rename/* dist/",
-    "start": "node backend/server.js",
+    "start": "node index.js",
     "clean": "rm -rf dist server.js",
     "lint": "echo 'Skipping frontend lint'"
   },

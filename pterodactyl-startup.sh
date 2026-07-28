@@ -16,6 +16,19 @@ echo "=========================================="
 echo "   NexusBot Zero-Console GitHub Sync     "
 echo "=========================================="
 
+# 0. Show current disk usage and auto-heal if we are extremely low on space
+echo "[System] Checking disk space..."
+df -h . 2>/dev/null || true
+
+# Proactively clear npm caches and node_modules if needed to ensure we can pull updates
+echo "[System] Proactively freeing up temporary space..."
+rm -rf .npm ~/.npm /tmp/npm-cache 2>/dev/null || true
+
+if [ ! -d "rename" ] || [ ! -f "backend/server.js" ]; then
+    echo "[System] Critical files or pre-built dashboard missing. Temporarily removing node_modules to guarantee space for Git sync..."
+    rm -rf node_modules 2>/dev/null || true
+fi
+
 # 1. Initialize Git repository if not present, handling corruption gracefully
 if [ ! -d ".git" ] || ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "[Git] Initializing or recovering git repository..."
@@ -75,11 +88,12 @@ fi
 
 # 4. Install / Verify Node dependencies (skipping devDependencies to save space)
 # Clean up any residual cache files first to free up as much space as possible
-rm -rf .npm ~/.npm 2>/dev/null || true
+rm -rf .npm ~/.npm /tmp/npm-cache 2>/dev/null || true
 
 if [ ! -d "node_modules" ]; then
     echo "[Node] node_modules not found. Installing production dependencies..."
-    npm install --omit=dev --no-audit --no-fund || npm install --production --no-audit --no-fund
+    npm install --omit=dev --no-audit --no-fund --cache=/tmp/npm-cache || npm install --production --no-audit --no-fund --cache=/tmp/npm-cache
+    rm -rf /tmp/npm-cache ~/.npm 2>/dev/null || true
 else
     echo "[Node] node_modules found. Ensuring native bindings are rebuilt..."
     npm rebuild || true
@@ -96,18 +110,7 @@ if [ -d "rename" ]; then
 elif [ -f "dist/index.html" ]; then
     echo "[Build] ✅ Pre-built dist/index.html found! Using committed production dashboard."
 else
-    echo "[Build] 📦 dist/index.html missing. Building web dashboard..."
-    if npm run build && [ -f "dist/index.html" ]; then
-        echo "[Build] ✅ Frontend build completed successfully!"
-    else
-        echo "[Build Warning] Frontend build failed or @rollup native binary incompatible. Attempting @rollup/wasm-node fallback..."
-        npm install --no-audit --no-fund @rollup/wasm-node || true
-        if npm run build && [ -f "dist/index.html" ]; then
-            echo "[Build] ✅ Frontend build completed successfully with WASM fallback!"
-        else
-            echo "[Build Warning] Could not compile frontend, proceeding if server has fallback..."
-        fi
-    fi
+    echo "[Build Warning] Web dashboard dist directory is missing."
 fi
 
 # 6. Start NexusBot
