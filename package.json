@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node backend/server.js",
-    "build": "vite build",
+    "build": "vite build && rm -rf rename && cp -r dist rename",
     "start": "node backend/server.js",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
