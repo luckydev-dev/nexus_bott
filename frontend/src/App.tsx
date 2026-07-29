@@ -22,11 +22,9 @@ import { FloatingSaveBar } from './components/FloatingSaveBar';
 
 // Pre-seeded Guilds
 const GUILDS = [
-  { id: '123456789012345678', name: 'Nexor Studio', icon: 'NS', memberCount: 1420, botInGuild: true, canAddBot: true, owner: true },
-  { id: '987654321098765432', name: 'Aether Core', icon: 'AC', memberCount: 840, botInGuild: true, canAddBot: true, owner: false },
-  { id: '556677889900112233', name: 'Vortex Esports', icon: 'VE', memberCount: 2930, botInGuild: false, canAddBot: true, owner: true },
-  { id: '778899001122334455', name: 'Cyber Horizon', icon: 'CH', memberCount: 1150, botInGuild: false, canAddBot: true, owner: false },
-  { id: '443322110099887766', name: 'Shadow Realm', icon: 'SR', memberCount: 512, botInGuild: false, canAddBot: false, owner: false }
+  { id: '123456789012345678', name: 'Nexor Studio', icon: 'NS', memberCount: 1420 },
+  { id: '987654321098765432', name: 'Aether Core', icon: 'AC', memberCount: 840 },
+  { id: '556677889900112233', name: 'Vortex Labs', icon: 'VL', memberCount: 2930 }
 ];
 
 // Premium customized toggle switch component to replace the old onoff switches
@@ -61,31 +59,11 @@ export default function App() {
 
   // Backend API URL configuration state (customizable for Pterodactyl hosting)
   const [backendUrl, setBackendUrl] = useState<string>(() => {
-    const saved = localStorage.getItem('custom_backend_url');
-    if (saved) return saved;
-    const envVal = (import.meta as any).env?.VITE_API_URL;
-    if (envVal) return envVal;
-    if (typeof window !== 'undefined' && window.location) {
-      const origin = window.location.origin;
-      if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
-        return origin;
-      }
-    }
-    return 'http://legacy-mum1.arixbyte.com:25567';
+    return localStorage.getItem('custom_backend_url') || (import.meta as any).env?.VITE_API_URL || 'http://78.154.103.29:13195';
   });
 
   const [tempBackendUrl, setTempBackendUrl] = useState<string>(() => {
-    const saved = localStorage.getItem('custom_backend_url');
-    if (saved) return saved;
-    const envVal = (import.meta as any).env?.VITE_API_URL;
-    if (envVal) return envVal;
-    if (typeof window !== 'undefined' && window.location) {
-      const origin = window.location.origin;
-      if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
-        return origin;
-      }
-    }
-    return 'http://legacy-mum1.arixbyte.com:25567';
+    return localStorage.getItem('custom_backend_url') || (import.meta as any).env?.VITE_API_URL || 'http://78.154.103.29:13195';
   });
   const [revealToken, setRevealToken] = useState<boolean>(false);
   const [copiedToken, setCopiedToken] = useState<boolean>(false);
@@ -119,77 +97,53 @@ export default function App() {
   // Fetch Discord guilds when discordUser/accessToken changes or backendUrl changes
   useEffect(() => {
     console.log('[App] discordUser change detected. Current state:', discordUser);
-    if (discordUser) {
+    if (discordUser && discordUser.accessToken) {
       console.log('[App] Attempting to fetch guilds with token:', discordUser.accessToken);
       const fetchRealGuilds = async () => {
         setIsLoading(true);
         try {
           const res = await fetch(`${backendUrl}/api/v1/auth/guilds`, {
-            headers: { 'Authorization': `Bearer ${discordUser.accessToken || 'simulated_token'}` }
+            headers: { 'Authorization': `Bearer ${discordUser.accessToken}` }
           });
           const data = await res.json();
           console.log('[App] Guild fetch response:', data);
           if (data.success && Array.isArray(data.guilds)) {
             // Map discord guilds to the format expected by the app
-            const mapped = data.guilds.map((g: any) => {
-              let canAddBot = g.canAddBot;
-              if (canAddBot === undefined) {
-                if (g.owner) {
-                  canAddBot = true;
-                } else {
-                  try {
-                    const p = BigInt(g.permissions || g.permissions_new || '0');
-                    const ADMINISTRATOR = 0x8n;
-                    const MANAGE_GUILD = 0x20n;
-                    canAddBot = (p & ADMINISTRATOR) === ADMINISTRATOR || (p & MANAGE_GUILD) === MANAGE_GUILD;
-                  } catch {
-                    canAddBot = false;
-                  }
-                }
-              }
-              return {
-                id: g.id,
-                name: g.name,
-                icon: g.icon ? (g.icon.startsWith('http') ? g.icon : `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png`) : g.name.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase(),
-                memberCount: g.memberCount || (150 + Math.floor(Math.random() * 4500)),
-                isReal: true,
-                botInGuild: g.botInGuild ?? false,
-                canAddBot: canAddBot,
-                owner: g.owner ?? false
-              };
-            });
+            const mapped = data.guilds.map((g: any) => ({
+              id: g.id,
+              name: g.name,
+              icon: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : g.name.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase(),
+              memberCount: 150 + Math.floor(Math.random() * 4500),
+              isReal: true,
+              botInGuild: g.botInGuild
+            }));
             if (mapped.length > 0) {
               setGuildsList(mapped);
-              const firstConnected = mapped.find((m: any) => m.botInGuild);
-              if (firstConnected) {
-                setActiveGuild(firstConnected);
-              } else {
-                setActiveGuild(mapped[0]);
-              }
+              setActiveGuild(mapped[0]);
               console.log(`Successfully loaded ${mapped.length} Discord servers!`);
             } else {
-              setGuildsList(GUILDS);
-              setActiveGuild(GUILDS[0]);
+              setGuildsList([]);
+              setActiveGuild(null);
               triggerToast('Connected, but no Discord servers were found.');
             }
           } else {
             console.error('[App] Guild fetch failed:', data.error);
-            setGuildsList(GUILDS);
-            setActiveGuild(GUILDS[0]);
+            setGuildsList([]);
+            setActiveGuild(null);
           }
         } catch (err) {
           console.error('Failed to fetch Discord guilds:', err);
-          setGuildsList(GUILDS);
-          setActiveGuild(GUILDS[0]);
+          setGuildsList([]);
+          setActiveGuild(null);
         } finally {
           setIsLoading(false);
         }
       };
       fetchRealGuilds();
     } else {
-      console.log('[App] No valid discordUser, using default guilds list');
-      setGuildsList(GUILDS);
-      setActiveGuild(GUILDS[0]);
+      console.log('[App] No valid discordUser or accessToken, clearing guilds');
+      setGuildsList([]);
+      setActiveGuild(null);
     }
   }, [discordUser, backendUrl]);
 
@@ -387,8 +341,7 @@ export default function App() {
 
   // Notifications / UI feedback
   const [toasts, setToasts] = useState<string[]>([]);
-  const [modalType, setModalType] = useState<'backup-success' | 'restore-confirm' | 'add-warning' | 'add-invite' | 'send-dm' | 'export-json' | 'import-json' | 'connection-settings' | 'none'>('none');
-  const [connectionTestStatus, setConnectionTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
+  const [modalType, setModalType] = useState<'backup-success' | 'restore-confirm' | 'add-warning' | 'add-invite' | 'send-dm' | 'export-json' | 'import-json' | 'none'>('none');
   const [newBackupCode, setNewBackupCode] = useState<string>('');
   const [restoreCodeInput, setRestoreCodeInput] = useState<string>('');
   const [selectedBackupId, setSelectedBackupId] = useState<string>('');
@@ -1013,21 +966,18 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Connected Servers Section */}
+              {/* Servers Section */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-emerald-400" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display">Connected Servers</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-bold">
-                    {guildsList.filter(g => g.botInGuild).length} Active
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-display">Your Discord Servers</span>
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">
+                    {guildsList.filter(g => g.botInGuild || !g.isReal).length} Connected
                   </span>
                 </div>
 
-                {/* Connected Servers Grid */}
+                {/* Server Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {guildsList.filter(g => g.botInGuild).map((guild) => {
+                  {guildsList.filter(g => g.botInGuild || !g.isReal).map((guild) => {
                     return (
                       <motion.div
                         key={guild.id}
@@ -1067,119 +1017,37 @@ export default function App() {
                     );
                   })}
 
-                  {guildsList.filter(g => g.botInGuild).length === 0 && (
-                    <div className="col-span-full p-6 bg-[#0f0f12] border border-white/5 rounded-xl text-center space-y-2">
-                      <Bot className="w-6 h-6 text-slate-500 mx-auto" />
-                      <p className="text-xs text-slate-400">No servers currently connected to NexusBot. Invite the bot below to get started.</p>
+                  {/* Invite/Add Bot Card */}
+                  <motion.a
+                    href="https://discord.com/oauth2/authorize?client_id=1528216029816426608&permissions=8&scope=bot%20applications.commands"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    whileHover={{ y: -3, scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="bg-[#0f0f12]/40 border border-dashed border-white/10 rounded-xl p-5 hover:border-[#5865F2]/40 transition-all flex flex-col items-center justify-center text-center gap-3 group min-h-[140px] shadow-md"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-white/5 group-hover:bg-[#5865F2]/10 group-hover:border-[#5865F2]/20 transition-all">
+                      <Plus className="w-5 h-5 text-slate-400 group-hover:text-[#5865F2] transition-colors" />
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Add Bot to Other Servers Section */}
-              <div className="space-y-4 pt-4 border-t border-white/5">
-                <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                  <div className="flex items-center gap-2">
-                    <PlusCircle className="w-4 h-4 text-[#5865F2]" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display">Add Bot to Your Other Servers</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-400 bg-slate-800/60 border border-white/5 px-2.5 py-0.5 rounded-full font-bold">
-                    {guildsList.filter(g => !g.botInGuild).length} Available
-                  </span>
-                </div>
-
-                {/* Grid of Other Servers */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {guildsList.filter(g => !g.botInGuild).map((guild) => {
-                    const canAdd = guild.canAddBot;
-                    return (
-                      <div
-                        key={guild.id}
-                        className={`rounded-xl p-5 border transition-all flex flex-col justify-between gap-4 relative overflow-hidden shadow-md ${
-                          canAdd
-                            ? 'bg-[#0f0f12] border-white/10 hover:border-[#5865F2]/40'
-                            : 'bg-slate-900/30 border-slate-800/80 grayscale-[0.3]'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 border ${
-                              canAdd 
-                                ? 'bg-[#5865F2]/10 border-white/10 text-white' 
-                                : 'bg-slate-800/60 border-slate-700/50 text-slate-500'
-                            }`}>
-                              {guild.icon && guild.icon.startsWith('http') ? (
-                                <img src={guild.icon} alt={guild.name} className={`w-full h-full object-cover rounded-xl ${!canAdd ? 'opacity-60' : ''}`} referrerPolicy="no-referrer" />
-                              ) : (
-                                <span>{guild.icon || guild.name.substring(0, 2).toUpperCase()}</span>
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <h3 className={`font-bold text-sm truncate ${canAdd ? 'text-white' : 'text-slate-400'}`}>{guild.name}</h3>
-                              <span className="text-[10px] text-slate-500 block">{(guild.memberCount || 0).toLocaleString()} Members</span>
-                            </div>
-                          </div>
-
-                          {/* Permission tag */}
-                          {canAdd ? (
-                            <span className="text-[9px] font-semibold bg-[#5865F2]/10 text-[#5865F2] border border-[#5865F2]/20 px-2 py-0.5 rounded-md shrink-0">
-                              {guild.owner ? 'Owner' : 'Manager'}
-                            </span>
-                          ) : (
-                            <span className="text-[9px] font-semibold bg-slate-800 text-slate-500 border border-slate-700/50 px-2 py-0.5 rounded-md shrink-0 flex items-center gap-1">
-                              <Lock className="w-2.5 h-2.5" /> No Permission
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="pt-2 border-t border-white/5 flex flex-col gap-2">
-                          {canAdd ? (
-                            <a
-                              href={`https://discord.com/oauth2/authorize?client_id=1528216029816426608&permissions=8&scope=bot%20applications.commands&guild_id=${guild.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-[#5865F2]/10 cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>Add Bot</span>
-                            </a>
-                          ) : (
-                            <button
-                              disabled
-                              title="You need Manage Server or Administrator permissions on Discord to add bots to this server."
-                              className="w-full bg-slate-800/80 text-slate-500 border border-slate-700/50 font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-not-allowed select-none opacity-80"
-                            >
-                              <Lock className="w-3.5 h-3.5 text-slate-500" />
-                              <span>Add Bot</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Generic Invite Card */}
-                  <div className="bg-[#0f0f12]/40 border border-dashed border-white/10 rounded-xl p-5 hover:border-[#5865F2]/40 transition-all flex flex-col justify-between gap-3 min-h-[140px]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-white/5">
-                        <Plus className="w-5 h-5 text-slate-400" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-bold text-white block">Custom Server Invite</span>
-                        <p className="text-[10px] text-slate-500">Invite NexusBot to another Discord server</p>
-                      </div>
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-bold text-white block group-hover:text-[#5865F2] transition-colors">Add Bot to Server</span>
+                      <p className="text-[10px] text-slate-500 leading-normal">Invite NexusBot to protect another guild</p>
                     </div>
-                    <a
-                      href="https://discord.com/oauth2/authorize?client_id=1528216029816426608&permissions=8&scope=bot%20applications.commands"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Open Bot Invite</span>
-                    </a>
-                  </div>
+                  </motion.a>
                 </div>
+
+                {/* Extra instructions if no servers */}
+                {guildsList.filter(g => g.botInGuild || !g.isReal).length === 0 && (
+                  <div className="p-8 bg-[#0f0f12] border border-white/5 rounded-xl text-center space-y-3">
+                    <Bot className="w-8 h-8 text-indigo-400 mx-auto" />
+                    <div className="space-y-1">
+                      <span className="text-xs font-bold text-white block">No active servers found with NexusBot</span>
+                      <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                        Connect with Discord and invite NexusBot to your guild to begin configuring features.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1372,35 +1240,13 @@ export default function App() {
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
                     <span className="text-xs font-mono text-emerald-400 font-semibold">Bot Node Active</span>
                   </div>
-                  <div className="bg-slate-900 rounded p-2.5 border border-slate-800 space-y-3">
-                    <div>
-                      <div className="flex justify-between text-[10px] mb-1 font-mono text-slate-400">
-                        <span>RAM: 1.1GB</span>
-                        <span>2GB</span>
-                      </div>
-                      <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-[#5865F2] w-[55%]"></div>
-                      </div>
+                  <div className="bg-slate-900 rounded p-2.5 border border-slate-800">
+                    <div className="flex justify-between text-[10px] mb-1 font-mono text-slate-400">
+                      <span>RAM: 1.1GB</span>
+                      <span>2GB</span>
                     </div>
-                    
-                    <div className="border-t border-white/5 pt-2 space-y-1">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[9px] text-slate-400 uppercase font-mono font-bold">Backend Port / IP</span>
-                        <button 
-                          onClick={() => {
-                            setTempBackendUrl(backendUrl);
-                            setConnectionTestStatus('idle');
-                            setModalType('connection-settings');
-                          }}
-                          className="text-[#5865F2] hover:text-[#4752C4] text-[9px] font-bold font-mono transition-all cursor-pointer flex items-center gap-1"
-                        >
-                          <Settings className="w-2.5 h-2.5" />
-                          <span>Configure</span>
-                        </button>
-                      </div>
-                      <div className="text-[9px] font-mono text-slate-500 truncate" title={backendUrl}>
-                        {backendUrl}
-                      </div>
+                    <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#5865F2] w-[55%]"></div>
                     </div>
                   </div>
                 </div>
@@ -2868,140 +2714,6 @@ export default function App() {
                   Issue Warn Ticket
                 </button>
               </form>
-            </motion.div>
-          </div>
-        )}
-
-        {modalType === 'connection-settings' && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-[#0f0f12] border border-white/10 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl"
-            >
-              <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                <div className="flex items-center gap-2">
-                  <Wifi className="w-4 h-4 text-[#5865F2]" />
-                  <h3 className="font-bold text-white text-sm uppercase font-display tracking-wide">Connection Settings</h3>
-                </div>
-                <button onClick={() => setModalType('none')} className="text-slate-400 hover:text-white cursor-pointer">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <p className="text-xs text-slate-400">
-                Specify your Discord bot's backend URL. The frontend will communicate with this server to fetch configuration and dispatch commands.
-              </p>
-
-              <div className="space-y-3 text-xs">
-                <div className="space-y-1.5">
-                  <label className="text-slate-400 block font-semibold">Backend Server URL</label>
-                  <input 
-                    type="text"
-                    value={tempBackendUrl}
-                    onChange={(e) => {
-                      setTempBackendUrl(e.target.value);
-                      setConnectionTestStatus('idle');
-                    }}
-                    placeholder="http://legacy-mum1.arixbyte.com:25567"
-                    className="w-full bg-[#0c0c0e] border border-white/10 hover:border-white/20 rounded-xl px-3 py-2 text-slate-200 focus:border-[#5865F2] focus:outline-none font-mono"
-                  />
-                </div>
-
-                {/* Connection Status Indicator */}
-                {connectionTestStatus !== 'idle' && (
-                  <div className={`p-2.5 rounded-lg border text-[10px] font-mono flex items-center gap-2 ${
-                    connectionTestStatus === 'testing' ? 'bg-slate-900 border-white/5 text-slate-400' :
-                    connectionTestStatus === 'success' ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-400' :
-                    'bg-red-950/20 border-red-500/20 text-red-400'
-                  }`}>
-                    {connectionTestStatus === 'testing' && <RefreshCw className="w-3 h-3 animate-spin shrink-0" />}
-                    {connectionTestStatus === 'success' && <CheckCircle className="w-3 h-3 shrink-0" />}
-                    {connectionTestStatus === 'failed' && <AlertTriangle className="w-3 h-3 shrink-0" />}
-                    <span>
-                      {connectionTestStatus === 'testing' ? 'Verifying connection to API endpoint...' :
-                       connectionTestStatus === 'success' ? 'Successfully connected to backend daemon!' :
-                       'Connection failed. Ensure backend is running and CORS is enabled.'}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex gap-2.5 pt-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setConnectionTestStatus('testing');
-                      try {
-                        let testUrl = tempBackendUrl.trim();
-                        if (testUrl.endsWith('/')) testUrl = testUrl.slice(0, -1);
-                        if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
-                          testUrl = 'http://' + testUrl;
-                        }
-                        const res = await fetch(`${testUrl}/api/v1/health`, { method: 'GET' });
-                        const data = await res.json();
-                        if (data.success || data.status === 'healthy') {
-                          setConnectionTestStatus('success');
-                        } else {
-                          setConnectionTestStatus('failed');
-                        }
-                      } catch (err) {
-                        setConnectionTestStatus('failed');
-                      }
-                    }}
-                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
-                  >
-                    <Activity className="w-3.5 h-3.5" />
-                    <span>Test API</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      localStorage.removeItem('custom_backend_url');
-                      const defaultUrl = (import.meta as any).env?.VITE_API_URL || 'http://legacy-mum1.arixbyte.com:25567';
-                      setTempBackendUrl(defaultUrl);
-                      setBackendUrl(defaultUrl);
-                      setConnectionTestStatus('idle');
-                      triggerToast('Connection reset to default host.');
-                      setModalType('none');
-                    }}
-                    className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-400 border border-white/5 rounded-xl font-medium text-xs transition cursor-pointer"
-                    title="Reset to default host"
-                  >
-                    Reset
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex gap-2.5 pt-2 border-t border-white/5">
-                <button 
-                  onClick={() => setModalType('none')}
-                  className="flex-1 py-2 bg-slate-900 border border-white/5 hover:bg-slate-800 text-slate-300 rounded-xl font-semibold text-xs transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={() => {
-                    let finalUrl = tempBackendUrl.trim();
-                    if (finalUrl.endsWith('/')) finalUrl = finalUrl.slice(0, -1);
-                    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
-                      finalUrl = 'http://' + finalUrl;
-                    }
-                    localStorage.setItem('custom_backend_url', finalUrl);
-                    setBackendUrl(finalUrl);
-                    setModalType('none');
-                    triggerToast(`Backend URL successfully updated: ${finalUrl}`);
-                    if (activeGuild?.id) {
-                      fetchGuildConfig(activeGuild.id);
-                    }
-                  }}
-                  className="flex-1 py-2 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save URL</span>
-                </button>
-              </div>
             </motion.div>
           </div>
         )}

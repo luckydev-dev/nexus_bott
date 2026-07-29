@@ -555,37 +555,19 @@ async function startServer() {
       res.status(500).json({ success: false, error: err.message });
     }
   });
-  const distPath = path.join(process.cwd(), "dist");
-  const indexPath = path.join(distPath, "index.html");
-
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa"
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(503).send("<html><body style='background:#0f0f12;color:#fff;font-family:sans-serif;padding:3rem;text-align:center;'><h2>NexusBot Dashboard Initializing</h2><p>Static frontend build (dist/index.html) is currently compiling or not found. Please run <code>npm run build</code> or restart the container.</p></body></html>");
-      }
+      res.sendFile(path.join(distPath, "index.html"));
     });
-  } else {
-    try {
-      const { createServer: createViteServer } = await import("vite");
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: "spa"
-      });
-      app.use(vite.middlewares);
-    } catch (viteErr) {
-      console.warn("[Vite Middleware Warning] Could not load Vite dev server middleware:", viteErr.message);
-      app.use(express.static(distPath));
-      app.get("*", (req, res) => {
-        if (fs.existsSync(indexPath)) {
-          res.sendFile(indexPath);
-        } else {
-          res.status(503).send("<html><body style='background:#0f0f12;color:#fff;font-family:sans-serif;padding:3rem;text-align:center;'><h2>NexusBot Dashboard Initializing</h2><p>Static frontend build (dist/index.html) is currently compiling or not found. Please run <code>npm run build</code>.</p></body></html>");
-        }
-      });
-    }
   }
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[NexusBot Server] Running at http://localhost:${PORT}`);
