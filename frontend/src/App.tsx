@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Server, Settings, Shield, MessageSquare, Key, History, User, Plus, Trash, 
   Lock, Unlock, Save, ExternalLink, Eye, PlusCircle, RefreshCw, Sliders, 
@@ -22,9 +23,11 @@ import { FloatingSaveBar } from './components/FloatingSaveBar';
 
 // Pre-seeded Guilds
 const GUILDS = [
-  { id: '123456789012345678', name: 'Nexor Studio', icon: 'NS', memberCount: 1420 },
-  { id: '987654321098765432', name: 'Aether Core', icon: 'AC', memberCount: 840 },
-  { id: '556677889900112233', name: 'Vortex Labs', icon: 'VL', memberCount: 2930 }
+  { id: '123456789012345678', name: 'Nexor Studio', icon: 'NS', memberCount: 1420, botInGuild: true, canAddBot: true, userRole: 'Server Owner', isReal: false },
+  { id: '987654321098765432', name: 'Aether Core', icon: 'AC', memberCount: 840, botInGuild: true, canAddBot: true, userRole: 'Administrator', isReal: false },
+  { id: '556677889900112233', name: 'Vortex Labs', icon: 'VL', memberCount: 2930, botInGuild: true, canAddBot: true, userRole: 'Manage Server', isReal: false },
+  { id: '778899001122334455', name: 'Cyber Realm', icon: 'CR', memberCount: 5120, botInGuild: false, canAddBot: true, userRole: 'Server Owner', isReal: false },
+  { id: '889900112233445566', name: 'Apex Legends India', icon: 'AL', memberCount: 3410, botInGuild: false, canAddBot: true, userRole: 'Administrator', isReal: false }
 ];
 
 // Premium customized toggle switch component to replace the old onoff switches
@@ -47,12 +50,93 @@ function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: () =>
 }
 
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState<'home' | 'dashboard'>('home');
   const [guildsList, setGuildsList] = useState<any[]>([]);
   const [activeGuild, setActiveGuild] = useState<any>(null);
   const [selectedMenu, setSelectedMenu] = useState<string>('automod');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Synchronize URL location with activeTab, activeGuild, and selectedMenu
+  useEffect(() => {
+    const path = location.pathname;
+    const segments = path.split('/').filter(Boolean);
+
+    if (segments.length === 0 || segments[0] === 'servers') {
+      if (activeTab !== 'home') setActiveTab('home');
+    } else if (segments[0] === 'dashboard') {
+      if (activeTab !== 'dashboard') setActiveTab('dashboard');
+
+      const validMenus = ['automod', 'antiraid', 'antinuke', 'whitelist', 'audit', 'warnings'];
+
+      if (segments.length === 1) {
+        const menu = 'automod';
+        if (selectedMenu !== menu) setSelectedMenu(menu);
+        if (activeGuild) {
+          navigate(`/dashboard/${activeGuild.id}/${menu}`, { replace: true });
+        }
+      } else if (segments.length === 2) {
+        const param = segments[1];
+        if (validMenus.includes(param)) {
+          if (selectedMenu !== param) setSelectedMenu(param);
+          if (activeGuild) {
+            navigate(`/dashboard/${activeGuild.id}/${param}`, { replace: true });
+          }
+        } else {
+          const guildId = param;
+          const found = guildsList.find((g: any) => String(g.id) === String(guildId));
+          if (found && activeGuild?.id !== found.id) {
+            setActiveGuild(found);
+          }
+          navigate(`/dashboard/${guildId}/automod`, { replace: true });
+        }
+      } else if (segments.length >= 3) {
+        const guildId = segments[1];
+        const menu = validMenus.includes(segments[2]) ? segments[2] : 'automod';
+        const found = guildsList.find((g: any) => String(g.id) === String(guildId));
+        if (found && activeGuild?.id !== found.id) {
+          setActiveGuild(found);
+        }
+        if (selectedMenu !== menu) {
+          setSelectedMenu(menu);
+        }
+      }
+    }
+  }, [location.pathname, guildsList]);
+
+  const handleMenuClick = (menu: string) => {
+    setSelectedMenu(menu);
+    setIsMobileMenuOpen(false);
+    if (activeGuild) {
+      navigate(`/dashboard/${activeGuild.id}/${menu}`);
+    } else {
+      navigate(`/dashboard/${menu}`);
+    }
+  };
+
+  const handleSelectGuild = (guild: any) => {
+    setActiveGuild(guild);
+    setActiveTab('dashboard');
+    navigate(`/dashboard/${guild.id}/${selectedMenu || 'automod'}`);
+  };
+
+  const handleDropdownGuildChange = (val: string) => {
+    const selected = guildsList.find((g: any) => String(g.id) === String(val));
+    if (selected) {
+      setActiveGuild(selected);
+      setIsMobileMenuOpen(false);
+      navigate(`/dashboard/${selected.id}/${selectedMenu || 'automod'}`);
+    }
+  };
+
+  const handleGoHome = () => {
+    setActiveTab('home');
+    setIsMobileMenuOpen(false);
+    navigate('/servers');
+  };
 
   // Discord OAuth State
   const [discordUser, setDiscordUser] = useState<{ username: string; avatarUrl: string; id: string; accessToken?: string } | null>(null);
@@ -135,17 +219,41 @@ export default function App() {
           console.log('[App] Guild fetch response:', data);
           if (data.success && Array.isArray(data.guilds)) {
             // Map discord guilds to the format expected by the app
-            const mapped = data.guilds.map((g: any) => ({
-              id: g.id,
-              name: g.name,
-              icon: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : g.name.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase(),
-              memberCount: 150 + Math.floor(Math.random() * 4500),
-              isReal: true,
-              botInGuild: g.botInGuild
-            }));
+            const mapped = data.guilds.map((g: any) => {
+              const perms = BigInt(g.permissions || g.permissions_new || '0');
+              const isOwner = Boolean(g.owner);
+              const isAdmin = isOwner || (perms & 8n) === 8n;
+              const canManage = isAdmin || (perms & 32n) === 32n;
+              let userRole = g.userRole;
+              if (!userRole) {
+                if (isOwner) userRole = 'Server Owner';
+                else if (isAdmin) userRole = 'Administrator';
+                else if (canManage) userRole = 'Manage Server';
+                else userRole = 'Member';
+              }
+              const canAddBot = g.canAddBot !== undefined ? g.canAddBot : canManage;
+
+              return {
+                id: g.id,
+                name: g.name,
+                icon: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : g.name.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase(),
+                memberCount: g.approximate_member_count || (150 + Math.floor(Math.random() * 4500)),
+                isReal: true,
+                botInGuild: g.botInGuild !== undefined ? g.botInGuild : false,
+                permissions: g.permissions,
+                owner: g.owner,
+                canAddBot,
+                userRole
+              };
+            });
             if (mapped.length > 0) {
               setGuildsList(mapped);
-              setActiveGuild(mapped[0]);
+              const connected = mapped.filter((g: any) => g.botInGuild);
+              if (connected.length > 0) {
+                setActiveGuild(connected[0]);
+              } else {
+                setActiveGuild(mapped[0]);
+              }
               console.log(`Successfully loaded ${mapped.length} Discord servers!`);
             } else {
               setGuildsList([]);
@@ -167,9 +275,9 @@ export default function App() {
       };
       fetchRealGuilds();
     } else {
-      console.log('[App] No valid discordUser or accessToken, clearing guilds');
-      setGuildsList([]);
-      setActiveGuild(null);
+      console.log('[App] No valid discordUser or accessToken, loading demo guilds');
+      setGuildsList(GUILDS);
+      setActiveGuild(GUILDS[0]);
     }
   }, [discordUser, backendUrl]);
 
@@ -850,28 +958,29 @@ export default function App() {
     }
   };
 
-  const handleMenuClick = (menu: string) => {
-    setSelectedMenu(menu);
-    setIsMobileMenuOpen(false);
-  };
-
   return (
     <div className="flex flex-col h-screen w-full bg-[#0c0c0e] text-slate-300 font-sans overflow-hidden shadow-2xl">
       {/* HEADER BAR */}
       <header className="h-16 border-b border-white/5 flex items-center justify-between px-3 md:px-6 bg-[#0f0f12] shrink-0 z-50 relative">
-        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+        <div 
+          onClick={handleGoHome}
+          className="flex items-center gap-1.5 sm:gap-3 min-w-0 cursor-pointer select-none group"
+        >
           {activeTab === 'dashboard' ? (
             <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMobileMenuOpen(!isMobileMenuOpen);
+              }}
               className="p-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white md:hidden transition-colors shrink-0"
               aria-label="Toggle menu"
             >
               {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           ) : (
-            <div className="w-8 h-8 bg-[#5865F2] rounded flex items-center justify-center font-bold text-white font-display shrink-0">N</div>
+            <div className="w-8 h-8 bg-[#5865F2] rounded flex items-center justify-center font-bold text-white font-display shrink-0 group-hover:scale-105 transition-transform">N</div>
           )}
-          <span className="font-bold tracking-tight text-white text-xs sm:text-sm md:text-base lg:text-lg font-display truncate">NEXUSBOT</span>
+          <span className="font-bold tracking-tight text-white text-xs sm:text-sm md:text-base lg:text-lg font-display truncate group-hover:text-[#5865F2] transition-colors">NEXUSBOT</span>
           <div className="h-4 w-px bg-slate-700 ml-1 hidden md:inline"></div>
           <span className="text-[9px] font-mono text-[#5865F2] uppercase tracking-widest ml-1 font-semibold hidden md:inline">v1.0.0 Stable</span>
         </div>
@@ -884,13 +993,7 @@ export default function App() {
               <CustomDropdown
                 id="guild-select"
                 value={activeGuild.id}
-                onChange={(val) => {
-                  const selected = guildsList.find(g => g.id === val);
-                  if (selected) {
-                    setActiveGuild(selected);
-                    setIsMobileMenuOpen(false);
-                  }
-                }}
+                onChange={handleDropdownGuildChange}
                 options={guildsList.filter(g => g.botInGuild || !g.isReal).map(g => ({
                   value: g.id,
                   label: g.name
@@ -992,27 +1095,24 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Servers Section */}
+              {/* Connected Servers Section */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center pb-2 border-b border-white/5">
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-display">Your Discord Servers</span>
                   <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">
-                    {guildsList.filter(g => g.botInGuild || !g.isReal).length} Connected
+                    {guildsList.filter(g => g.botInGuild).length} Connected
                   </span>
                 </div>
 
                 {/* Server Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {guildsList.filter(g => g.botInGuild || !g.isReal).map((guild) => {
+                  {guildsList.filter(g => g.botInGuild).map((guild) => {
                     return (
                       <motion.div
                         key={guild.id}
                         whileHover={{ y: -3, scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() => {
-                          setActiveGuild(guild);
-                          setActiveTab('dashboard');
-                        }}
+                        onClick={() => handleSelectGuild(guild)}
                         className="bg-[#0f0f12] border border-white/5 rounded-xl p-5 hover:border-[#5865F2]/40 transition-all cursor-pointer flex flex-col gap-4 relative overflow-hidden group shadow-lg animate-fade-in"
                       >
                         {/* Top background glow on hover */}
@@ -1062,8 +1162,8 @@ export default function App() {
                   </motion.a>
                 </div>
 
-                {/* Extra instructions if no servers */}
-                {guildsList.filter(g => g.botInGuild || !g.isReal).length === 0 && (
+                {/* Extra instructions if no connected servers */}
+                {guildsList.filter(g => g.botInGuild).length === 0 && (
                   <div className="p-8 bg-[#0f0f12] border border-white/5 rounded-xl text-center space-y-3">
                     <Bot className="w-8 h-8 text-indigo-400 mx-auto" />
                     <div className="space-y-1">
@@ -1075,6 +1175,66 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* Unconnected / Eligible Servers Section */}
+              {guildsList.filter(g => !g.botInGuild && g.canAddBot).length > 0 && (
+                <div className="space-y-4 pt-6 border-t border-white/5">
+                  <div className="flex justify-between items-center pb-2">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display block">
+                        Servers Available to Protect
+                      </span>
+                      <p className="text-[11px] text-slate-500">
+                        Servers where you hold Owner, Admin, or Manage Server roles, but NexusBot is not added yet.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full font-bold">
+                      {guildsList.filter(g => !g.botInGuild && g.canAddBot).length} Available
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {guildsList.filter(g => !g.botInGuild && g.canAddBot).map((guild) => (
+                      <motion.div
+                        key={guild.id}
+                        whileHover={{ y: -2, scale: 1.01 }}
+                        className="bg-[#0f0f12]/50 border border-dashed border-white/10 hover:border-[#5865F2]/40 rounded-xl p-5 flex flex-col justify-between gap-4 transition-all opacity-75 hover:opacity-100 group shadow-md"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-xl bg-slate-800/80 border border-white/10 text-slate-300 font-bold flex items-center justify-center text-base shrink-0 group-hover:border-[#5865F2]/30 transition-all">
+                            {guild.icon && guild.icon.startsWith('http') ? (
+                              <img src={guild.icon} alt={guild.name} className="w-full h-full object-cover rounded-xl" referrerPolicy="no-referrer" />
+                            ) : (
+                              <span>{guild.icon || guild.name.substring(0, 2).toUpperCase()}</span>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-slate-200 text-sm truncate group-hover:text-white transition-colors">{guild.name}</h3>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-indigo-300 border border-indigo-500/20">
+                                {guild.userRole === 'Server Owner' ? '👑 Owner' : guild.userRole === 'Administrator' ? '🛡️ Admin' : '⚙️ Manager'}
+                              </span>
+                              <span className="text-[10px] text-slate-500 truncate">{(guild.memberCount || 0).toLocaleString()} Members</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-white/5 flex flex-col gap-2">
+                          <a
+                            href={`https://discord.com/oauth2/authorize?client_id=1528216029816426608&permissions=8&scope=bot%20applications.commands${guild.isReal ? `&guild_id=${guild.id}` : ''}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full py-2 px-3 bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Add Bot to Server</span>
+                          </a>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -1097,10 +1257,7 @@ export default function App() {
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1 font-display flex justify-between items-center">
                     <span>Selected Server</span>
                     <button 
-                      onClick={() => {
-                        setActiveTab('home');
-                        setIsMobileMenuOpen(false);
-                      }}
+                      onClick={handleGoHome}
                       className="text-[#5865F2] hover:underline normal-case font-semibold text-[9px] cursor-pointer"
                     >
                       Change
@@ -1117,12 +1274,7 @@ export default function App() {
                     <div className="flex-1 min-w-0">
                       <CustomDropdown
                         value={activeGuild.id}
-                        onChange={(val) => {
-                          const selected = guildsList.find(g => g.id === val);
-                          if (selected) {
-                            setActiveGuild(selected);
-                          }
-                        }}
+                        onChange={handleDropdownGuildChange}
                         options={guildsList.filter(g => g.botInGuild || !g.isReal).map(g => ({
                           value: g.id,
                           label: g.name
@@ -1162,7 +1314,7 @@ export default function App() {
               {(!sidebarSearch || ['automod', 'antiraid', 'antinuke', 'whitelist', 'security'].some(k => k.includes(sidebarSearch.toLowerCase()))) && (
                 <nav className="space-y-1">
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2 font-display">Security Protection</div>
-                  {(!sidebarSearch || 'automod filters'.includes(sidebarSearch.toLowerCase())) && (
+                  {(!sidebarSearch || 'automod'.includes(sidebarSearch.toLowerCase())) && (
                     <button
                       id="nav-automod"
                       onClick={() => handleMenuClick('automod')}
@@ -1173,10 +1325,10 @@ export default function App() {
                       }`}
                     >
                       <NexusIcon name="automod" fallback={<Shield className="w-4 h-4 text-amber-400" />} />
-                      <span>AutoMod Filters</span>
+                      <span>AutoMod</span>
                     </button>
                   )}
-                  {(!sidebarSearch || 'antiraid defense'.includes(sidebarSearch.toLowerCase())) && (
+                  {(!sidebarSearch || 'antiraid'.includes(sidebarSearch.toLowerCase())) && (
                     <button
                       id="nav-antiraid"
                       onClick={() => handleMenuClick('antiraid')}
@@ -1187,10 +1339,10 @@ export default function App() {
                       }`}
                     >
                       <NexusIcon name="antiraid" fallback={<Zap className="w-4 h-4 text-red-400" />} />
-                      <span>Anti-Raid Defense</span>
+                      <span>Anti-Raid</span>
                     </button>
                   )}
-                  {(!sidebarSearch || 'antinuke safeguards'.includes(sidebarSearch.toLowerCase())) && (
+                  {(!sidebarSearch || 'antinuke'.includes(sidebarSearch.toLowerCase())) && (
                     <button
                       id="nav-antinuke"
                       onClick={() => handleMenuClick('antinuke')}
@@ -1201,10 +1353,10 @@ export default function App() {
                       }`}
                     >
                       <NexusIcon name="antinuke" fallback={<Bot className="w-4 h-4 text-[#5865F2]" />} />
-                      <span>Anti-Nuke Safeguards</span>
+                      <span>Anti-Nuke</span>
                     </button>
                   )}
-                  {(!sidebarSearch || 'whitelist exemptions'.includes(sidebarSearch.toLowerCase())) && (
+                  {(!sidebarSearch || 'whitelist'.includes(sidebarSearch.toLowerCase())) && (
                     <button
                       id="nav-whitelist"
                       onClick={() => handleMenuClick('whitelist')}
@@ -1215,7 +1367,7 @@ export default function App() {
                       }`}
                     >
                       <NexusIcon name="whitelist" fallback={<UserCheck className="w-4 h-4 text-emerald-400" />} />
-                      <span>Whitelist & Exemptions</span>
+                      <span>Whitelist</span>
                     </button>
                   )}
                 </nav>

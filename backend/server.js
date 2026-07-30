@@ -370,10 +370,24 @@ async function startServer() {
       if (guildsRes.ok) {
         const guilds = await guildsRes.json();
         const botGuilds = botClient && typeof botClient.isReady === "function" && botClient.isReady() ? botClient.guilds.cache : null;
-        const mappedGuilds = guilds.map(g => ({
-          ...g,
-          botInGuild: botGuilds ? botGuilds.has(g.id) : true
-        }));
+        const mappedGuilds = guilds.map(g => {
+          const perms = BigInt(g.permissions || g.permissions_new || '0');
+          const isOwner = Boolean(g.owner);
+          const isAdmin = isOwner || (perms & 8n) === 8n;
+          const canManage = isAdmin || (perms & 32n) === 32n;
+          let userRole = 'Member';
+          if (isOwner) userRole = 'Server Owner';
+          else if (isAdmin) userRole = 'Administrator';
+          else if (canManage) userRole = 'Manage Server';
+
+          return {
+            ...g,
+            botInGuild: botGuilds ? botGuilds.has(g.id) : false,
+            canAddBot: canManage,
+            userRole,
+            permissionsBitfield: String(g.permissions || g.permissions_new || '0')
+          };
+        });
         return res.json({ success: true, guilds: mappedGuilds });
       } else {
         const errText = await guildsRes.text();
