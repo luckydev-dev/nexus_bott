@@ -57,13 +57,39 @@ export default function App() {
   // Discord OAuth State
   const [discordUser, setDiscordUser] = useState<{ username: string; avatarUrl: string; id: string; accessToken?: string } | null>(null);
 
+  // Helper function to format API URLs cleanly
+  const formatBackendUrl = (url: string): string => {
+    let cleaned = (url || '').trim();
+    if (!cleaned || cleaned.includes('78.154.103.29') || cleaned.includes('13195')) {
+      return 'http://legacy-mum1.arixbyte.com:25567';
+    }
+    if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+      cleaned = 'http://' + cleaned;
+    }
+    return cleaned.replace(/\/+$/, '');
+  };
+
   // Backend API URL configuration state (customizable for Pterodactyl hosting)
   const [backendUrl, setBackendUrl] = useState<string>(() => {
-    return localStorage.getItem('custom_backend_url') || (import.meta as any).env?.VITE_API_URL || 'http://78.154.103.29:13195';
+    const stored = localStorage.getItem('custom_backend_url');
+    if (stored) {
+      const formatted = formatBackendUrl(stored);
+      if (stored !== formatted) {
+        localStorage.setItem('custom_backend_url', formatted);
+      }
+      return formatted;
+    }
+    const envUrl = (import.meta as any).env?.VITE_API_URL;
+    if (envUrl) return formatBackendUrl(envUrl);
+    return 'http://legacy-mum1.arixbyte.com:25567';
   });
 
   const [tempBackendUrl, setTempBackendUrl] = useState<string>(() => {
-    return localStorage.getItem('custom_backend_url') || (import.meta as any).env?.VITE_API_URL || 'http://78.154.103.29:13195';
+    const stored = localStorage.getItem('custom_backend_url');
+    if (stored) return formatBackendUrl(stored);
+    const envUrl = (import.meta as any).env?.VITE_API_URL;
+    if (envUrl) return formatBackendUrl(envUrl);
+    return 'http://legacy-mum1.arixbyte.com:25567';
   });
   const [revealToken, setRevealToken] = useState<boolean>(false);
   const [copiedToken, setCopiedToken] = useState<boolean>(false);

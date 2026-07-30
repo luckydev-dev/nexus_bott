@@ -63,16 +63,12 @@ export function initializeDiscordBot() {
     console.log(`[NexusBot Gateway] Logged in as ${client.user.tag}`);
     
     // Human-like rotating presence statuses with custom emojis
-    const shieldEmoji = getCustomEmojiObject('nexus_shield');
-    const antiraidEmoji = getCustomEmojiObject('nexus_antiraid');
-    const automodEmoji = getCustomEmojiObject('nexus_automod');
-
     const presenceList = [
       { 
         name: 'custom', 
         type: ActivityType.Custom, 
         state: 'Keeping channels clean & safe', 
-        ...(shieldEmoji ? { emoji: shieldEmoji } : {})
+        emoji: getCustomEmojiObject('nexus_shield') || { name: '🛡️' } 
       },
       { 
         name: '/help • /automod • /antinuke', 
@@ -82,7 +78,7 @@ export function initializeDiscordBot() {
         name: 'custom', 
         type: ActivityType.Custom, 
         state: 'Watching spam & raid attempts', 
-        ...(antiraidEmoji ? { emoji: antiraidEmoji } : {})
+        emoji: getCustomEmojiObject('nexus_antiraid') || { name: '⚔️' } 
       },
       { 
         name: 'Fastest Mod Action', 
@@ -92,7 +88,7 @@ export function initializeDiscordBot() {
         name: 'custom', 
         type: ActivityType.Custom, 
         state: 'NexusBot Protection Active', 
-        ...(automodEmoji ? { emoji: automodEmoji } : {})
+        emoji: getCustomEmojiObject('nexus_automod') || { name: '🛡️' } 
       }
     ];
 

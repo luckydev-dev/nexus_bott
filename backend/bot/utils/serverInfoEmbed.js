@@ -94,24 +94,6 @@ export async function getServerInfoEmbedAndComponents(guild, category = 'general
       desc = desc.substring(0, 1950) + '\n...and more roles';
     }
     embed.setDescription(desc || 'No roles found.');
-  } else if (category === 'icon' || category === 'servericon') {
-    const icon = emoji('nexus_link') || emoji('nexus_server');
-    embed.setTitle(`${p(icon)}Server Icon - ${guild.name}`);
-    const iconUrl = guild.iconURL({ dynamic: true, size: 1024 });
-    if (iconUrl) {
-      embed.setImage(iconUrl);
-      const png = guild.iconURL({ extension: 'png', size: 1024 });
-      const jpg = guild.iconURL({ extension: 'jpg', size: 1024 });
-      const webp = guild.iconURL({ extension: 'webp', size: 1024 });
-      const isAnimated = guild.icon?.startsWith('a_');
-      const gif = isAnimated ? guild.iconURL({ extension: 'gif', size: 1024 }) : null;
-
-      let links = `${p(emoji('nexus_link'))}[PNG](${png}) | [JPG](${jpg}) | [WEBP](${webp})`;
-      if (gif) links += ` | [GIF](${gif})`;
-      embed.setDescription(links);
-    } else {
-      embed.setDescription('This server does not have an icon.');
-    }
   } else {
     // Default / 'general'
     const icon = emoji('nexus_server');
@@ -149,22 +131,16 @@ export async function getServerInfoEmbedAndComponents(guild, category = 'general
     {
       label: 'Roles',
       value: 'serverinfo_roles'
-    },
-    {
-      label: 'Server Icon',
-      value: 'serverinfo_icon'
     }
   ];
 
   const serverEmojiObj = getCustomEmojiObject('nexus_server');
   const statsEmojiObj = getCustomEmojiObject('nexus_stats');
   const rolesEmojiObj = getCustomEmojiObject('nexus_roles');
-  const linkEmojiObj = getCustomEmojiObject('nexus_link');
 
   if (serverEmojiObj) menuOptions[0].emoji = serverEmojiObj;
   if (statsEmojiObj) menuOptions[1].emoji = statsEmojiObj;
   if (rolesEmojiObj) menuOptions[2].emoji = rolesEmojiObj;
-  if (linkEmojiObj) menuOptions[3].emoji = linkEmojiObj;
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId('serverinfo_category_select')

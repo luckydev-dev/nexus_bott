@@ -701,24 +701,8 @@ export const commands = [
     ]
   },
   {
-    name: 'avatar',
-    description: 'Displays a user avatar and download links.',
-    options: [
-      {
-        name: 'user',
-        description: 'Target member to display avatar for (defaults to self)',
-        type: 6, // USER
-        required: false
-      }
-    ]
-  },
-  {
     name: 'serverinfo',
     description: 'Displays server security overview, member metrics, and verification status.'
-  },
-  {
-    name: 'servericon',
-    description: 'Displays the server icon and download links.'
   },
   {
     name: 'massrole',

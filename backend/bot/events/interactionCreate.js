@@ -1598,19 +1598,6 @@ export default async function handleInteraction(interaction) {
       }
     }
 
-    if (commandName === 'avatar') {
-      const targetUser = interaction.options.getUser('user') || interaction.user;
-      await interaction.deferReply();
-
-      try {
-        const { embeds, components } = await getUserInfoEmbedAndComponents(interaction.guild, targetUser, 'avatar', interaction.user);
-        return interaction.editReply({ embeds, components });
-      } catch (err) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to fetch avatar: ${err.message}`);
-        return interaction.editReply({ embeds: [embed] });
-      }
-    }
-
     // 30. Serverinfo command
     if (commandName === 'serverinfo') {
       await interaction.deferReply();
@@ -1619,17 +1606,6 @@ export default async function handleInteraction(interaction) {
         return interaction.editReply({ embeds, components });
       } catch (err) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to fetch server info: ${err.message}`);
-        return interaction.editReply({ embeds: [embed] });
-      }
-    }
-
-    if (commandName === 'servericon') {
-      await interaction.deferReply();
-      try {
-        const { embeds, components } = await getServerInfoEmbedAndComponents(interaction.guild, 'icon', interaction.user);
-        return interaction.editReply({ embeds, components });
-      } catch (err) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to fetch server icon: ${err.message}`);
         return interaction.editReply({ embeds: [embed] });
       }
     }
