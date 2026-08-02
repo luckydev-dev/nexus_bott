@@ -29,6 +29,14 @@ import {
   getChannelSelectViewAndComponents,
   createChannelEmbedFieldModal
 } from '../utils/channelEmbedBuilder.js';
+import {
+  createTicketSetupSession,
+  getTicketSetupSession,
+  deleteTicketSetupSession,
+  getTicketSetupBuilderViewAndComponents,
+  createTicketFieldModal,
+  createAddTicketButtonModal
+} from '../utils/ticketSetupBuilder.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -300,64 +308,42 @@ export default async function handleInteraction(interaction) {
       const subcommand = interaction.options.getSubcommand(false) || 'setup';
 
       if (subcommand === 'setup') {
-        const targetChannel = interaction.channel;
-        
-        const ticketEmoji = getCustomEmoji('nexus_ticket') || '🎫';
-        const createTicketEmoji = getCustomEmoji('nexus_createticket') || '✉️';
-
-        const embed = new EmbedBuilder()
-          .setColor('#5865F2')
-          .setTitle(`${ticketEmoji} Nexus Support Ticket Panel`)
-          .setDescription('Need assistance? Click one of the buttons below to open a direct support request with our server administration team.')
-          .setThumbnail(interaction.guild.iconURL({ dynamic: true }) || 'https://cdn.discordapp.com/embed/avatars/0.png')
-          .setFooter({ text: 'NexusBot Support Automation System' })
-          .setTimestamp();
-
-        const btnRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId('ticket_open_general')
-            .setLabel('General Support')
-            .setEmoji(resolveEmojiObject('nexus_ticket', 'ticket'))
-            .setStyle(ButtonStyle.Primary),
-          new ButtonBuilder()
-            .setCustomId('ticket_open_billing')
-            .setLabel('Billing Support')
-            .setEmoji(resolveEmojiObject('nexus_createticket', 'createticket'))
-            .setStyle(ButtonStyle.Success)
-        );
-
-        try {
-          await targetChannel.send({ embeds: [embed], components: [btnRow] });
-          addGuildAudit(guildId, 'TICKETS', 'SETUP_SUCCESS', `Deployed ticket panel in #${targetChannel.name}`, interaction.user.tag);
-
-          const confirmEmbed = new EmbedBuilder()
-            .setColor('#10B981')
-            .setTitle(`${getCustomEmoji('nexus_tick') || '✅'} Ticket Panel Deployed`)
-            .setDescription(`Successfully sent the interactive ticket panel to <#${targetChannel.id}>.`);
-          return interaction.reply({ embeds: [confirmEmbed], ephemeral: true });
-        } catch (err) {
-          console.error('[Ticket Setup Error]', err);
-          const errEmbed = new EmbedBuilder()
-            .setColor('#EF4444')
-            .setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Failed to send ticket panel to <#${targetChannel.id}>: ${err.message}`);
-          return interaction.reply({ embeds: [errEmbed], ephemeral: true });
-        }
+        const sessionId = createTicketSetupSession({ userId: interaction.user.id, guildId: interaction.guildId });
+        const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
+        return interaction.reply({ embeds: view.embeds, components: view.components, ephemeral: true });
       }
 
       if (subcommand === 'config') {
+        const guildSettings = getGuildSettings(interaction.guildId);
+        const ticketConfig = guildSettings.tickets || {};
+
         const embed = new EmbedBuilder()
           .setColor('#5865F2')
-          .setTitle(`${getCustomEmoji('nexus_ticket') || '🎫'} Active Ticket System Configuration`)
-          .setDescription('Ticket system module is active and ready.')
+          .setTitle(`${getCustomEmoji('nexus_ticket') || '🎫'} Ticket System Configuration`)
+          .setDescription(ticketConfig.enabled ? 'Ticket system module is active and configured.' : 'No active ticket configuration found or setup is pending.')
           .addFields(
-            { name: 'Status', value: '`ONLINE & ACTIVE`', inline: true },
-            { name: 'Default Categories', value: '`TICKETS (SUPPORT)`, `BILLING-QUERIES`', inline: true },
-            { name: 'Auto-Routing', value: '`Enabled`', inline: true }
+            { name: 'Panel Title', value: `\`${ticketConfig.panelTitle || 'Default Support Ticket Panel'}\``, inline: true },
+            { name: 'Target Category ID', value: ticketConfig.categoryId ? `<#${ticketConfig.categoryId}>` : '`Auto-Category`', inline: true },
+            { name: 'Configured Buttons', value: `\`${ticketConfig.buttons ? ticketConfig.buttons.length : 2}\` active category buttons`, inline: true },
+            { name: 'Welcome Message', value: `\`\`\`${ticketConfig.welcomeMessage || 'Default welcome message'}\`\`\`` }
           )
-          .setFooter({ text: 'Use /ticket setup to deploy panel in a channel' })
+          .setFooter({ text: 'Click "Edit Ticket Configuration" below to customize panel embed, buttons, and welcome message.' })
           .setTimestamp();
 
-        return interaction.reply({ embeds: [embed], ephemeral: true });
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`tkt_btn_config_edit_${interaction.guildId}`)
+            .setLabel('Edit Ticket Configuration')
+            .setEmoji(resolveEmojiObject('nexus_settings', 'settings'))
+            .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId(`tkt_btn_config_deploy_new_${interaction.guildId}`)
+            .setLabel('Deploy New Panel')
+            .setEmoji(resolveEmojiObject('nexus_tick', 'tick'))
+            .setStyle(ButtonStyle.Success)
+        );
+
+        return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
       }
     }
 
@@ -1902,6 +1888,33 @@ export default async function handleInteraction(interaction) {
       const modal = createChannelEmbedFieldModal(sessionId, fieldName);
       return interaction.showModal(modal);
     }
+    if (customId.startsWith('tkt_select_field_')) {
+      const sessionId = customId.replace('tkt_select_field_', '');
+      const fieldName = values[0];
+      const session = getTicketSetupSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      const currentValue = session.panelData[fieldName] || '';
+      const modal = createTicketFieldModal(sessionId, fieldName, currentValue);
+      return interaction.showModal(modal);
+    }
+    if (customId.startsWith('tkt_select_category_')) {
+      const sessionId = customId.replace('tkt_select_category_', '');
+      const session = getTicketSetupSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        return interaction.update({ embeds: [embed], components: [] });
+      }
+
+      const categoryId = values[0];
+      session.panelData.categoryId = categoryId === 'default' ? '' : categoryId;
+
+      const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
+      return interaction.update({ embeds: view.embeds, components: view.components });
+    }
   } else if (interaction.isChannelSelectMenu()) {
     const { customId, values } = interaction;
     if (customId.startsWith('chan_select_channel_')) {
@@ -1954,20 +1967,156 @@ export default async function handleInteraction(interaction) {
   } else if (interaction.isButton()) {
     const { customId } = interaction;
 
-    // Handle ticket creation and management buttons
-    if (customId.startsWith('ticket_open_')) {
-      const categoryType = customId.replace('ticket_open_', '');
-      const categoryName = categoryType === 'billing' ? 'BILLING-QUERIES' : 'TICKETS (SUPPORT)';
-      const userName = interaction.user.username.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const channelName = `${userName}-ticket`;
+    // Handle ticket setup builder buttons
+    if (customId.startsWith('tkt_btn_add_')) {
+      const sessionId = customId.replace('tkt_btn_add_', '');
+      const session = getTicketSetupSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
 
-      let parentCategory = interaction.guild.channels.cache.find(c => c.type === 4 && c.name.toUpperCase().includes('TICKET'));
+      const modal = createAddTicketButtonModal(sessionId);
+      return interaction.showModal(modal);
+    }
+
+    if (customId.startsWith('tkt_btn_welcome_')) {
+      const sessionId = customId.replace('tkt_btn_welcome_', '');
+      const session = getTicketSetupSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      const modal = createTicketFieldModal(sessionId, 'welcomeMessage', session.panelData.welcomeMessage);
+      return interaction.showModal(modal);
+    }
+
+    if (customId.startsWith('tkt_btn_clear_btns_')) {
+      const sessionId = customId.replace('tkt_btn_clear_btns_', '');
+      const session = getTicketSetupSession(sessionId);
+      if (session) {
+        session.panelData.buttons = [];
+        const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
+        return interaction.update({ embeds: view.embeds, components: view.components });
+      }
+    }
+
+    if (customId.startsWith('tkt_btn_cancel_')) {
+      const sessionId = customId.replace('tkt_btn_cancel_', '');
+      deleteTicketSetupSession(sessionId);
+      const cancelEmbed = new EmbedBuilder()
+        .setColor('#EF4444')
+        .setTitle(`${getCustomEmoji('nexus_cross') || '❌'} Ticket Setup Cancelled`)
+        .setDescription('Ticket builder setup prompt cancelled.');
+      return interaction.update({ embeds: [cancelEmbed], components: [] });
+    }
+
+    if (customId.startsWith('tkt_btn_config_edit_') || customId.startsWith('tkt_btn_config_deploy_new_')) {
+      const settings = getGuildSettings(interaction.guildId);
+      const initialData = settings.tickets || null;
+      const sessionId = createTicketSetupSession({ userId: interaction.user.id, guildId: interaction.guildId, initialData });
+      const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
+      return interaction.update({ embeds: view.embeds, components: view.components });
+    }
+
+    if (customId.startsWith('tkt_btn_deploy_')) {
+      const sessionId = customId.replace('tkt_btn_deploy_', '');
+      const session = getTicketSetupSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        return interaction.update({ embeds: [embed], components: [] });
+      }
+
+      const { panelData } = session;
+      const targetChannel = interaction.channel;
+
+      const deployEmbed = new EmbedBuilder()
+        .setColor(panelData.color && /^#[0-9A-F]{6}$/i.test(panelData.color) ? panelData.color : '#5865F2')
+        .setTitle(panelData.title || '🎫 Support Ticket Panel')
+        .setDescription(panelData.description || 'Click a button below to open a ticket.')
+        .setTimestamp();
+
+      if (panelData.thumbnail) deployEmbed.setThumbnail(panelData.thumbnail);
+      else if (interaction.guild.iconURL({ dynamic: true })) deployEmbed.setThumbnail(interaction.guild.iconURL({ dynamic: true }));
+
+      if (panelData.footer) deployEmbed.setFooter({ text: panelData.footer });
+
+      const btnRow = new ActionRowBuilder();
+      const buttonsList = panelData.buttons && panelData.buttons.length > 0 ? panelData.buttons : [
+        { id: 'btn_default_1', label: 'General Support', categoryName: 'General Support', emoji: 'nexus_ticket', style: 'Primary' }
+      ];
+
+      buttonsList.slice(0, 5).forEach((btn, index) => {
+        const btnStyle = btn.style === 'Success' ? ButtonStyle.Success : (btn.style === 'Danger' ? ButtonStyle.Danger : ButtonStyle.Primary);
+        const emojiObj = resolveEmojiObject(btn.emoji || 'nexus_ticket', 'ticket');
+        const b = new ButtonBuilder()
+          .setCustomId(`tkt_action_open_${index}_${sessionId}`)
+          .setLabel(btn.label)
+          .setStyle(btnStyle);
+        if (emojiObj) b.setEmoji(emojiObj);
+        btnRow.addComponents(b);
+      });
+
+      try {
+        await targetChannel.send({ embeds: [deployEmbed], components: [btnRow] });
+
+        const settings = getGuildSettings(interaction.guildId);
+        settings.tickets = {
+          enabled: true,
+          panelTitle: panelData.title,
+          panelDescription: panelData.description,
+          welcomeMessage: panelData.welcomeMessage,
+          color: panelData.color,
+          thumbnail: panelData.thumbnail,
+          footer: panelData.footer,
+          categoryId: panelData.categoryId,
+          buttons: buttonsList,
+          counter: settings.tickets?.counter || 1
+        };
+        saveGuildSettings(interaction.guildId, settings);
+        addGuildAudit(interaction.guildId, 'TICKETS', 'PANEL_DEPLOYED', `Deployed custom ticket panel in #${targetChannel.name}`, interaction.user.tag);
+
+        deleteTicketSetupSession(sessionId);
+
+        const confirmEmbed = new EmbedBuilder()
+          .setColor('#10B981')
+          .setTitle(`${getCustomEmoji('nexus_tick') || '✅'} Ticket Panel Deployed`)
+          .setDescription(`Successfully sent the interactive ticket panel to <#${targetChannel.id}>.`);
+
+        return interaction.update({ embeds: [confirmEmbed], components: [] });
+      } catch (err) {
+        console.error('[Ticket Deploy Error]', err);
+        deleteTicketSetupSession(sessionId);
+        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Failed to deploy ticket panel: ${err.message}`);
+        return interaction.update({ embeds: [errEmbed], components: [] });
+      }
+    }
+
+    // Handle ticket channel creation when user clicks a button on deployed panel
+    if (customId.startsWith('tkt_action_open_') || customId.startsWith('ticket_open_')) {
+      const guildSettings = getGuildSettings(interaction.guildId);
+      const ticketConfig = guildSettings.tickets || {};
+      
+      let counter = ticketConfig.counter || 1;
+      ticketConfig.counter = counter + 1;
+      guildSettings.tickets = ticketConfig;
+      saveGuildSettings(interaction.guildId, guildSettings);
+
+      const cleanUserName = interaction.user.username.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const channelName = `${cleanUserName}-ticket-${counter}`;
+
+      let parentCategoryId = ticketConfig.categoryId;
+      if (!parentCategoryId) {
+        const cat = interaction.guild.channels.cache.find(c => c.type === ChannelType.GuildCategory && c.name.toUpperCase().includes('TICKET'));
+        if (cat) parentCategoryId = cat.id;
+      }
 
       try {
         const ticketChannel = await interaction.guild.channels.create({
           name: channelName,
-          type: 0, // GUILD_TEXT
-          parent: parentCategory ? parentCategory.id : undefined,
+          type: ChannelType.GuildText,
+          parent: parentCategoryId || undefined,
           permissionOverwrites: [
             {
               id: interaction.guild.roles.everyone.id,
@@ -1984,31 +2133,35 @@ export default async function handleInteraction(interaction) {
           ]
         });
 
+        const rawWelcome = ticketConfig.welcomeMessage || 'Welcome {user}! Thank you for contacting support. Our staff team has been notified and will assist you shortly.';
+        const welcomeText = rawWelcome.replace(/\{user\}/g, `<@${interaction.user.id}>`);
+
         const welcomeEmbed = new EmbedBuilder()
           .setColor('#5865F2')
           .setTitle(`${getCustomEmoji('nexus_ticket') || '🎫'} Support Ticket Opened`)
-          .setDescription(`Welcome <@${interaction.user.id}>! Thank you for contacting support. Our team has been notified and will assist you shortly. In the meantime, please explain your request in detail.`)
+          .setDescription(welcomeText)
           .addFields(
-            { name: 'Category', value: `\`${categoryName}\``, inline: true },
+            { name: 'Ticket Ref', value: `\`#${counter}\``, inline: true },
             { name: 'Opened By', value: `<@${interaction.user.id}>`, inline: true }
           )
-          .setFooter({ text: 'NexusBot Helpdesk System' })
+          .setFooter({ text: 'NexusBot Support Ticket Automation' })
           .setTimestamp();
 
         const actionRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId('ticket_claim')
+            .setCustomId('tkt_act_claim')
             .setLabel('Claim Ticket')
             .setEmoji(resolveEmojiObject('nexus_createticket', 'createticket'))
             .setStyle(ButtonStyle.Primary),
           new ButtonBuilder()
-            .setCustomId('ticket_close')
+            .setCustomId('tkt_act_close')
             .setLabel('Close Ticket')
             .setEmoji(resolveEmojiObject('nexus_ticket', 'ticket'))
             .setStyle(ButtonStyle.Secondary),
           new ButtonBuilder()
-            .setCustomId('ticket_delete')
-            .setLabel('Delete')
+            .setCustomId('tkt_act_delete')
+            .setLabel('Delete Ticket')
+            .setEmoji(resolveEmojiObject('nexus_cross', 'cross'))
             .setStyle(ButtonStyle.Danger)
         );
 
@@ -2016,7 +2169,8 @@ export default async function handleInteraction(interaction) {
 
         const replyEmbed = new EmbedBuilder()
           .setColor('#10B981')
-          .setDescription(`${getCustomEmoji('nexus_tick') || '✅'} Your support ticket has been opened: <#${ticketChannel.id}>`);
+          .setDescription(`${getCustomEmoji('nexus_tick') || '✅'} Support ticket created: <#${ticketChannel.id}>`);
+
         return interaction.reply({ embeds: [replyEmbed], ephemeral: true });
       } catch (err) {
         console.error('[Ticket Creation Error]', err);
@@ -2027,19 +2181,19 @@ export default async function handleInteraction(interaction) {
       }
     }
 
-    if (customId === 'ticket_claim') {
+    if (customId === 'tkt_act_claim' || customId === 'ticket_claim') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) && !interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
         return interaction.reply({ content: '❌ Only staff members can claim tickets.', ephemeral: true });
       }
 
       const claimEmbed = new EmbedBuilder()
         .setColor('#10B981')
-        .setDescription(`${getCustomEmoji('nexus_ticket') || '🎫'} Ticket claimed by <@${interaction.user.id}>. They will handle your issue.`);
+        .setDescription(`${getCustomEmoji('nexus_ticket') || '🎫'} Ticket claimed by <@${interaction.user.id}>. They will handle your inquiry.`);
       await interaction.reply({ embeds: [claimEmbed] });
       return;
     }
 
-    if (customId === 'ticket_close') {
+    if (customId === 'tkt_act_close' || customId === 'ticket_close') {
       try {
         await interaction.channel.permissionOverwrites.edit(interaction.user.id, {
           SendMessages: false
@@ -2054,7 +2208,7 @@ export default async function handleInteraction(interaction) {
       return;
     }
 
-    if (customId === 'ticket_delete') {
+    if (customId === 'tkt_act_delete' || customId === 'ticket_delete') {
       await interaction.reply({ content: '🗑️ Deleting ticket channel in 5 seconds...' });
       setTimeout(() => {
         interaction.channel?.delete().catch(() => {});
@@ -2328,6 +2482,49 @@ export default async function handleInteraction(interaction) {
       session.embedData[fieldName] = newValue;
 
       const view = getChannelEmbedBuilderViewAndComponents(sessionId);
+      return interaction.update({ embeds: view.embeds, components: view.components });
+    }
+
+    if (customId.startsWith('tkt_modal_add_button_')) {
+      const sessionId = customId.replace('tkt_modal_add_button_', '');
+      const session = getTicketSetupSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      const label = interaction.fields.getTextInputValue('button_label');
+      const categoryName = interaction.fields.getTextInputValue('category_name');
+      const emoji = interaction.fields.getTextInputValue('button_emoji') || 'nexus_ticket';
+
+      session.panelData.buttons.push({
+        id: `btn_${Date.now()}`,
+        label: label.trim(),
+        categoryName: categoryName.trim(),
+        emoji: emoji.trim(),
+        style: 'Primary'
+      });
+
+      const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
+      return interaction.update({ embeds: view.embeds, components: view.components });
+    }
+
+    if (customId.startsWith('tkt_modal_field_')) {
+      const rest = customId.replace('tkt_modal_field_', '');
+      const parts = rest.split('_');
+      const fieldName = parts[0];
+      const sessionId = parts.slice(1).join('_');
+
+      const session = getTicketSetupSession(sessionId);
+      if (!session) {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      const newValue = interaction.fields.getTextInputValue('field_value');
+      session.panelData[fieldName] = newValue;
+
+      const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
       return interaction.update({ embeds: view.embeds, components: view.components });
     }
   }

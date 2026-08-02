@@ -4,6 +4,7 @@
  */
 
 import * as emojis from './emojis.js';
+import { getCustomEmojiObject, CUSTOM_EMOJIS } from './customEmojis.js';
 
 const STATUS = {
   success: ['nexus_tick'],
@@ -129,4 +130,21 @@ export function statusEmojiObject(key) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Resolves an emoji object for buttons/select menus using custom emoji or status mapping.
+ * @param {string} input
+ * @param {string} fallbackKey
+ * @returns {object|null}
+ */
+export function resolveEmojiObject(input, fallbackKey = 'success') {
+  if (!input) return statusEmojiObject(fallbackKey);
+  if (typeof input === 'string' && (input.startsWith('nexus_') || (CUSTOM_EMOJIS && CUSTOM_EMOJIS[input]))) {
+    return getCustomEmojiObject(input) || statusEmojiObject(fallbackKey);
+  }
+  const obj = statusEmojiObject(input);
+  if (obj) return obj;
+  if (typeof input === 'string') return { name: input };
+  return null;
 }
