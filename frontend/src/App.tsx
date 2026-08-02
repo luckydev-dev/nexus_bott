@@ -10,7 +10,7 @@ import {
   Lock, Unlock, Save, ExternalLink, Eye, PlusCircle, RefreshCw, Sliders, 
   UserCheck, Bot, Zap, Sparkles, AlertTriangle, Check, CheckCircle, Download, 
   Upload, X, HelpCircle, Activity, Heart, Bell, Trash2, Send, ChevronRight, Copy,
-  Menu, BookOpen, Wifi, MoreVertical, Edit, UserMinus, Search, Filter, FileText
+  Menu, BookOpen, Wifi, MoreVertical, Edit, UserMinus, Search, Filter, FileText, Ticket
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -20,6 +20,7 @@ import {
 import { CustomDropdown, MultiSelectDropdown } from './components/CustomDropdown';
 import { NexusIcon } from './components/NexusIcon';
 import { FloatingSaveBar } from './components/FloatingSaveBar';
+import { TicketSetup } from './components/TicketSetup';
 
 // Pre-seeded Guilds
 const GUILDS = [
@@ -70,7 +71,7 @@ export default function App() {
     } else if (segments[0] === 'dashboard') {
       if (activeTab !== 'dashboard') setActiveTab('dashboard');
 
-      const validMenus = ['automod', 'antiraid', 'antinuke', 'whitelist', 'audit', 'warnings'];
+      const validMenus = ['automod', 'antiraid', 'antinuke', 'whitelist', 'audit', 'warnings', 'tickets'];
 
       if (segments.length === 1) {
         const menu = 'automod';
@@ -1393,7 +1394,7 @@ export default function App() {
                     </button>
                   )}
 
-                  {(!sidebarSearch || 'warning tickets infractions'.includes(sidebarSearch.toLowerCase())) && (
+                  {(!sidebarSearch || 'warning infractions'.includes(sidebarSearch.toLowerCase())) && (
                     <button
                       id="nav-warnings"
                       onClick={() => handleMenuClick('warnings')}
@@ -1405,6 +1406,28 @@ export default function App() {
                     >
                       <NexusIcon name="warning" fallback={<AlertTriangle className="w-4 h-4 text-amber-400" />} />
                       <span>Member Warnings</span>
+                    </button>
+                  )}
+                </nav>
+              )}
+
+              {/* Category: Help Desk & Support */}
+              {(!sidebarSearch || ['tickets', 'support', 'panel', 'config'].some(k => k.includes(sidebarSearch.toLowerCase()))) && (
+                <nav className="space-y-1">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2 font-display">Help Desk & Support</div>
+
+                  {(!sidebarSearch || 'tickets support config setup'.includes(sidebarSearch.toLowerCase())) && (
+                    <button
+                      id="nav-tickets"
+                      onClick={() => handleMenuClick('tickets')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs transition-all cursor-pointer ${
+                        selectedMenu === 'tickets' 
+                          ? 'bg-[#5865F2] text-white font-bold shadow shadow-[#5865F2]/20' 
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <NexusIcon name="ticket" fallback={<Ticket className="w-4 h-4 text-indigo-400" />} />
+                      <span>Ticket System</span>
                     </button>
                   )}
                 </nav>
@@ -2620,6 +2643,15 @@ export default function App() {
                         </table>
                       </div>
                     </div>
+                  )}
+
+                  {/* TICKET SETUP MODULE */}
+                  {selectedMenu === 'tickets' && (
+                    <TicketSetup
+                      discordUser={discordUser}
+                      triggerToast={triggerToast}
+                      addAuditLog={addAuditLog}
+                    />
                   )}
 
                   {/* END CONTENT PANELS */}
