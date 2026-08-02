@@ -844,5 +844,21 @@ export const commands = [
         required: false
       }
     ]
+  },
+  {
+    name: 'ticket',
+    description: 'Helpdesk ticket system management and setup',
+    options: [
+      {
+        name: 'setup',
+        description: 'Deploy an interactive helpdesk ticket panel in the current channel',
+        type: 1 // SUB_COMMAND
+      },
+      {
+        name: 'config',
+        description: 'View or manage active ticket panel configurations',
+        type: 1 // SUB_COMMAND
+      }
+    ]
   }
 ];

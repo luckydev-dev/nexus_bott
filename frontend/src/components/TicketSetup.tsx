@@ -5,11 +5,17 @@
 
 import React, { useState } from 'react';
 import { 
-  Ticket, Plus, Trash2, Edit, MessageSquare, Check, PlusCircle, 
-  ChevronRight, ArrowRight, FolderPlus, Send, User, Bot, Trash, 
-  Lock, Unlock, ShieldAlert, Heart, X, Sparkles, HelpCircle, Eye
+  Plus, Trash2, MessageSquare, PlusCircle, 
+  ArrowRight, FolderPlus, Send, X, ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { 
+  DiscordEmoji, 
+  DiscordUserAvatar, 
+  nexus_ticket, 
+  nexus_createticket, 
+  DISCORD_EMOJIS 
+} from '../emojis';
 
 // Interfaces for our Ticket Config
 interface PanelButton {
@@ -60,11 +66,11 @@ interface TicketSetupProps {
 
 // Preloaded mock Discord categories
 const DISCORD_CATEGORIES = [
-  '📁 TICKETS (SUPPORT)',
-  '📁 BILLING-QUERIES',
-  '📁 TECH-SUPPORT',
-  '📁 GAME-SERVERS',
-  '📁 GENERAL-HELP'
+  'TICKETS (SUPPORT)',
+  'BILLING-QUERIES',
+  'TECH-SUPPORT',
+  'GAME-SERVERS',
+  'GENERAL-HELP'
 ];
 
 // Preloaded mock Discord channels
@@ -79,7 +85,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
   // Current user name
   const userName = discordUser?.username || 'lucky';
 
-  // State for active panel views ('setup_cmd' | 'config_cmd' | 'simulation')
+  // State for active panel views ('setup' | 'config' | 'simulation')
   const [activeTab, setActiveTab] = useState<'setup' | 'config' | 'simulation'>('setup');
 
   // Interactive Ticket Configs list (populated with a pre-seeded one or empty)
@@ -87,15 +93,15 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
     {
       id: 'panel-1',
       embed: {
-        title: '🎫 Nexus Support Ticket Panel',
+        title: `${nexus_ticket} Nexus Support Ticket Panel`,
         description: 'Need assistance? Click one of the buttons below to open a direct support request with our server administration team.',
         color: '#5865F2',
         thumbnail: 'https://cdn.discordapp.com/icons/123456789012345678/NS.png',
         footer: 'NexusBot Support Automation System'
       },
       buttons: [
-        { id: 'btn-1', name: 'General Support', emoji: '🎫', categoryName: 'General Support', channelCategoryName: '📁 TICKETS (SUPPORT)' },
-        { id: 'btn-2', name: 'Billing Issues', emoji: '💰', categoryName: 'Billing Support', channelCategoryName: '📁 BILLING-QUERIES' }
+        { id: 'btn-1', name: 'General Support', emoji: nexus_ticket, categoryName: 'General Support', channelCategoryName: 'TICKETS (SUPPORT)' },
+        { id: 'btn-2', name: 'Billing Issues', emoji: nexus_createticket, categoryName: 'Billing Support', channelCategoryName: 'BILLING-QUERIES' }
       ],
       targetChannelId: '1', // #create-a-ticket
       welcomeMessage: 'Welcome to your ticket! A staff member will be with you shortly. Please describe your issue in detail.'
@@ -107,7 +113,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
 
   // Currently constructing panel state (for /ticket setup)
   const [currentEmbed, setCurrentEmbed] = useState<EmbedConfig>({
-    title: '✉️ Nexus Help & Tickets',
+    title: `${nexus_createticket} Nexus Help & Tickets`,
     description: 'Select an appropriate category below to contact staff directly regarding Server Issues, Partnerships, or General Inquiries.',
     color: '#34D399',
     thumbnail: '',
@@ -115,7 +121,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
   });
 
   const [panelButtons, setPanelButtons] = useState<PanelButton[]>([
-    { id: 'btn-init-1', name: 'Open Ticket', emoji: '🎫', categoryName: 'Server Support', channelCategoryName: '📁 TICKETS (SUPPORT)' }
+    { id: 'btn-init-1', name: 'Open Ticket', emoji: nexus_createticket, categoryName: 'Server Support', channelCategoryName: 'TICKETS (SUPPORT)' }
   ]);
 
   const [targetChannelId, setTargetChannelId] = useState<string>('1');
@@ -126,18 +132,17 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
   // Editing active configs state (for /ticket config)
   const [selectedConfigId, setSelectedConfigId] = useState<string>('panel-1');
   const [isEditingConfig, setIsEditingConfig] = useState<boolean>(false);
-  const [editingEmbedField, setEditingEmbedField] = useState<'title' | 'description' | 'color' | 'thumbnail' | 'footer' | 'welcome_message'>('title');
 
   // Modal State for adding button
   const [addButtonModalOpen, setAddButtonModalOpen] = useState<boolean>(false);
   const [newBtnName, setNewBtnName] = useState<string>('');
   const [newBtnCategory, setNewBtnCategory] = useState<string>('');
-  const [newBtnEmoji, setNewBtnEmoji] = useState<string>('🎫');
+  const [newBtnEmoji, setNewBtnEmoji] = useState<string>(nexus_createticket);
 
   // Prompt category after adding button
   const [pendingButton, setPendingButton] = useState<PanelButton | null>(null);
   const [channelCategorySelectOpen, setChannelCategorySelectOpen] = useState<boolean>(false);
-  const [selectedChannelCategory, setSelectedChannelCategory] = useState<string>('📁 TICKETS (SUPPORT)');
+  const [selectedChannelCategory, setSelectedChannelCategory] = useState<string>('TICKETS (SUPPORT)');
 
   // Selected channel page for setup
   const [setupStep, setSetupStep] = useState<'builder' | 'channel_selection'>('builder');
@@ -148,14 +153,31 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
   const [simMessageText, setSimMessageText] = useState<string>('');
   const [ticketCounter, setTicketCounter] = useState<number>(1);
 
-  // Common emojis list
-  const EMOJI_OPTIONS = ['🎫', '💰', '🛠️', '❓', '🔒', '🛡️', '⚡', '📣', '🐞', '💡', '🎮', '🔔'];
+  // Custom Discord emojis options list
+  const EMOJI_OPTIONS = [
+    nexus_ticket,
+    nexus_createticket,
+    'nexus_ticket',
+    'nexus_createticket'
+  ];
+
+  // Helper to extract clean display text from title that may include custom emoji tags
+  const cleanTitle = (rawTitle: string) => {
+    if (!rawTitle) return '';
+    return rawTitle
+      .replace(/<:nexus_ticket:\d+>/g, '')
+      .replace(/<:nexus_createticket:\d+>/g, '')
+      .replace(/nexus_ticket/g, '')
+      .replace(/nexus_createticket/g, '')
+      .replace(/[🎫✉️🛡️]/g, '')
+      .trim();
+  };
 
   // Handle opening modal for Add Button
   const handleOpenAddButton = () => {
     setNewBtnName('');
     setNewBtnCategory('');
-    setNewBtnEmoji('🎫');
+    setNewBtnEmoji(nexus_createticket);
     setAddButtonModalOpen(true);
   };
 
@@ -177,7 +199,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
     setAddButtonModalOpen(false);
     // Proceed to Category Select Prompt
     setPendingButton(newBtn);
-    setSelectedChannelCategory('📁 TICKETS (SUPPORT)');
+    setSelectedChannelCategory('TICKETS (SUPPORT)');
     setChannelCategorySelectOpen(true);
   };
 
@@ -219,7 +241,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
 
     setPanelConfigs([...panelConfigs, newConfig]);
     addAuditLog('TICKETS', 'SETUP_SUCCESS', `Created ticket panel "${newConfig.embed.title}" in #${DISCORD_CHANNELS.find(c => c.id === targetChannelId)?.name}`);
-    triggerToast('🎉 Ticket setup completed! Panel successfully deployed.');
+    triggerToast('Ticket setup completed! Panel successfully deployed.');
     
     // Switch to active simulation
     setActiveTab('simulation');
@@ -237,7 +259,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
     const newTicket: SimulatedTicket = {
       id: 'ticket-' + Date.now(),
       channelName,
-      categoryName: button.channelCategoryName || '📁 TICKETS (SUPPORT)',
+      categoryName: button.channelCategoryName || 'TICKETS (SUPPORT)',
       creatorName: userName,
       status: 'open',
       welcomeMessage: customWelcome,
@@ -283,7 +305,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
               {
                 sender: 'moderator',
                 senderName: 'Moderator Alex',
-                text: '👋 Hello! I have claimed your ticket and will be assisting you shortly. How can I help?',
+                text: 'Hello! I have claimed your ticket and will be assisting you shortly. How can I help?',
                 time
               },
               {
@@ -309,7 +331,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
               {
                 sender: 'system',
                 senderName: 'SYSTEM',
-                text: `🔒 Ticket closed by Moderator Alex. Conversation is now archived.`,
+                text: `Ticket closed by Moderator Alex. Conversation is now archived.`,
                 time
               }
             ]
@@ -367,7 +389,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                 {
                   sender: 'bot',
                   senderName: 'NexusBot Support AI',
-                  text: '🤖 Auto-Response: Staff have been pinged. For faster service, please ensure you have provided relevant transaction IDs, logs, or server links!',
+                  text: 'Auto-Response: Staff have been pinged. For faster service, please ensure you have provided relevant transaction IDs, logs, or server links!',
                   time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 }
               ]
@@ -377,19 +399,6 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
         }));
       }, 1000);
     }
-  };
-
-  // Load configured panel into editor for /ticket config
-  const handleStartEditConfig = (config: TicketPanelConfig) => {
-    setSelectedConfigId(config.id);
-    setCurrentEmbed({ ...config.embed });
-    setPanelButtons([...config.buttons]);
-    setTargetChannelId(config.targetChannelId);
-    setWelcomeMessage(config.welcomeMessage);
-    setIsEditingConfig(true);
-    setSetupStep('builder');
-    setActiveTab('setup');
-    triggerToast(`Editing configuration for "${config.embed.title}"`);
   };
 
   // Save changes to edited config
@@ -424,11 +433,11 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-white/5">
           <div>
             <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg border border-indigo-500/20">
-                <Ticket className="w-4 h-4" />
+              <div className="p-1 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                <DiscordEmoji name="nexus_ticket" sizeClassName="w-5 h-5" />
               </div>
               <h2 className="text-sm font-bold text-white uppercase tracking-wider font-display">
-                🎫 Discord Help Desk & Ticket System
+                Discord Help Desk & Ticket System
               </h2>
             </div>
             <p className="text-[11px] text-slate-500 mt-0.5">
@@ -491,9 +500,12 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                 <div className="space-y-5">
                   <div className="bg-slate-950/40 p-4 rounded-xl border border-white/5 space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display block">
-                        {isEditingConfig ? '🛠️ Editing Configured Embed Panel' : '🎨 STEP 1: Construct Embed Panel'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <DiscordEmoji name="nexus_createticket" sizeClassName="w-4 h-4" />
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display block">
+                          {isEditingConfig ? 'Editing Configured Embed Panel' : 'STEP 1: Construct Embed Panel'}
+                        </span>
+                      </div>
                       <span className="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full font-bold">
                         Interactive Builder
                       </span>
@@ -560,15 +572,18 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display block">
-                          🔘 STEP 2: Configure Embed Panel Action Buttons
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <DiscordEmoji name="nexus_ticket" sizeClassName="w-4 h-4" />
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display block">
+                            STEP 2: Configure Embed Panel Action Buttons
+                          </span>
+                        </div>
                         <p className="text-[11px] text-slate-500">Each button will open a specific type of ticket</p>
                       </div>
                       <button
                         type="button"
                         onClick={handleOpenAddButton}
-                        className="flex items-center gap-1 bg-[#5865F2] hover:bg-[#4752C4] text-white py-1.5 px-3 rounded-lg text-[11px] font-bold shadow hover:scale-102 transition"
+                        className="flex items-center gap-1.5 bg-[#5865F2] hover:bg-[#4752C4] text-white py-1.5 px-3 rounded-lg text-[11px] font-bold shadow hover:scale-102 transition cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add Button</span>
@@ -587,7 +602,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                             className="bg-slate-950/40 border border-white/5 rounded-xl p-3 flex justify-between items-center group hover:border-[#5865F2]/20 transition"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="text-base select-none shrink-0">{btn.emoji}</span>
+                              <DiscordEmoji name={btn.emoji} sizeClassName="w-5 h-5" />
                               <div className="min-w-0">
                                 <h4 className="text-xs font-bold text-slate-200 truncate">{btn.name}</h4>
                                 <span className="text-[9px] text-slate-500 block font-mono uppercase tracking-wider truncate">
@@ -611,9 +626,12 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
 
                   {/* EDIT THE WELCOME MESSAGE */}
                   <div className="space-y-1.5 bg-slate-950/20 p-4 border border-white/5 rounded-xl">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display block">
-                      💬 STEP 3: Customize Ticket Welcome Message
-                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <DiscordEmoji name="nexus_createticket" sizeClassName="w-4 h-4" />
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display block">
+                        STEP 3: Customize Ticket Welcome Message
+                      </label>
+                    </div>
                     <p className="text-[11px] text-slate-500">
                       The intro welcome greeting sent immediately when a user clicks a button to open a ticket.
                     </p>
@@ -659,14 +677,14 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                     <button
                       type="button"
                       onClick={() => setSetupStep('builder')}
-                      className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg font-semibold text-xs border border-white/5 transition"
+                      className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-lg font-semibold text-xs border border-white/5 transition cursor-pointer"
                     >
                       Back to Editor
                     </button>
                     <button
                       type="button"
                       onClick={isEditingConfig ? handleSaveConfigEdit : handleDeployPanel}
-                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-md transition"
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-md transition cursor-pointer"
                     >
                       {isEditingConfig ? 'Save Changes' : 'Send & Deploy Panel'}
                     </button>
@@ -688,18 +706,18 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                           setIsEditingConfig(false);
                           setActiveTab('config');
                         }}
-                        className="py-1.5 px-3 bg-slate-900 border border-white/5 hover:bg-slate-800 text-slate-400 rounded-lg font-semibold text-xs transition"
+                        className="py-1.5 px-3 bg-slate-900 border border-white/5 hover:bg-slate-800 text-slate-400 rounded-lg font-semibold text-xs transition cursor-pointer"
                       >
                         Cancel
                       </button>
                     )}
                     <button
                       type="button"
-                      onClick={() => setSetupStep('channel_selection')}
-                      className="flex items-center gap-1.5 bg-[#5865F2] hover:bg-[#4752C4] text-white py-1.5 px-4 rounded-lg text-xs font-bold shadow transition cursor-pointer"
+                      onClick={isEditingConfig ? handleSaveConfigEdit : handleDeployPanel}
+                      className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-4 rounded-lg text-xs font-bold shadow transition cursor-pointer"
                     >
-                      <span>{isEditingConfig ? 'Save / Deploy Location' : 'Next: Target Channel'}</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isEditingConfig ? 'Save Changes' : 'Deploy Panel in Channel'}</span>
                     </button>
                   </div>
                 </div>
@@ -711,9 +729,12 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
           {activeTab === 'config' && (
             <div className="space-y-4 h-full flex flex-col justify-between">
               <div className="space-y-4">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display block">
-                  🛡️ Active Configured Ticket Panel Modules
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <DiscordEmoji name="nexus_ticket" sizeClassName="w-4 h-4" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display block">
+                    Active Configured Ticket Panel Modules
+                  </span>
+                </div>
 
                 {panelConfigs.length === 0 ? (
                   <div className="p-12 border border-dashed border-white/5 rounded-2xl bg-slate-950/20 text-center space-y-3">
@@ -733,7 +754,10 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                         <div className="space-y-3.5">
                           <div className="flex justify-between items-start gap-2">
                             <div className="min-w-0">
-                              <h3 className="font-bold text-slate-200 text-xs truncate">{config.embed.title}</h3>
+                              <div className="flex items-center gap-1.5 font-bold text-slate-200 text-xs truncate">
+                                <DiscordEmoji name="nexus_ticket" sizeClassName="w-3.5 h-3.5" />
+                                <span className="truncate">{cleanTitle(config.embed.title)}</span>
+                              </div>
                               <span className="text-[9px] text-[#5865F2] font-mono block mt-0.5">
                                 Posted in #{DISCORD_CHANNELS.find(c => c.id === config.targetChannelId)?.name || 'unknown'}
                               </span>
@@ -748,36 +772,42 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                             <p className="line-clamp-2 italic">"{config.welcomeMessage}"</p>
                           </div>
 
-                          <div className="flex flex-wrap gap-1.5">
-                            {config.buttons.map((btn) => (
-                              <span 
-                                key={btn.id}
-                                className="text-[9px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-white/5 text-slate-300"
-                              >
-                                {btn.emoji} {btn.name}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {config.buttons.map(b => (
+                              <span key={b.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-900 border border-white/5 rounded text-[9px] text-slate-300 font-mono">
+                                <DiscordEmoji name={b.emoji} sizeClassName="w-3 h-3" />
+                                <span>{b.name}</span>
                               </span>
                             ))}
                           </div>
                         </div>
 
-                        <div className="pt-3 border-t border-white/5 flex gap-2">
+                        <div className="flex gap-2 pt-2 border-t border-white/5">
                           <button
-                            onClick={() => handleStartEditConfig(config)}
-                            className="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 text-indigo-400 font-bold border border-white/5 rounded-lg text-[10px] flex items-center justify-center gap-1 cursor-pointer transition"
+                            onClick={() => {
+                              setSelectedConfigId(config.id);
+                              setCurrentEmbed({ ...config.embed });
+                              setPanelButtons([...config.buttons]);
+                              setTargetChannelId(config.targetChannelId);
+                              setWelcomeMessage(config.welcomeMessage);
+                              setIsEditingConfig(true);
+                              setSetupStep('builder');
+                              setActiveTab('setup');
+                              triggerToast(`Editing configuration for "${cleanTitle(config.embed.title)}"`);
+                            }}
+                            className="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded text-xs font-semibold border border-white/5 transition cursor-pointer"
                           >
-                            <Edit className="w-3 h-3" />
-                            <span>Edit Embed / Config</span>
+                            Edit Embed
                           </button>
                           <button
                             onClick={() => {
                               setPanelConfigs(panelConfigs.filter(c => c.id !== config.id));
-                              addAuditLog('TICKETS', 'DELETE', `Deleted ticket panel "${config.embed.title}"`);
-                              triggerToast('Configured ticket panel deleted');
+                              triggerToast('Deleted configuration panel module');
                             }}
-                            className="p-1.5 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition cursor-pointer border border-transparent hover:border-rose-500/20"
+                            className="p-1.5 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded transition cursor-pointer"
                             title="Delete panel config"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -788,15 +818,15 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
             </div>
           )}
 
-          {/* TAB 3: SIMULATED TICKET CHATS (Interactive Room) */}
+          {/* TAB 3: LIVE SIMULATED CHATS */}
           {activeTab === 'simulation' && (
-            <div className="flex flex-col md:flex-row gap-4 h-full">
-              {/* Ticket Channels Selector */}
-              <div className="w-full md:w-48 bg-slate-950 rounded-xl border border-white/5 p-3 flex flex-col gap-2 shrink-0 overflow-y-auto max-h-[300px] md:max-h-full">
-                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-display block px-1">
-                  Active Channels
+            <div className="flex flex-col md:flex-row gap-4 h-full min-h-[350px]">
+              {/* Ticket Channels List Sidebar */}
+              <div className="w-full md:w-48 bg-slate-950/60 rounded-xl p-3 border border-white/5 space-y-2 shrink-0">
+                <span className="text-[9px] font-bold text-slate-500 uppercase font-mono tracking-wider block px-1">
+                  Active Ticket Channels ({simulatedTickets.length})
                 </span>
-                
+
                 {simulatedTickets.length === 0 ? (
                   <div className="py-8 text-center text-[10px] text-slate-500 px-2 italic">
                     No active tickets. Open one by clicking a button in the Live Discord Panel on the right!
@@ -853,17 +883,19 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                             {activeTicket.status === 'open' && (
                               <button
                                 onClick={() => handleTicketAction(activeTicket.id, 'claim')}
-                                className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded text-[9px] uppercase tracking-wide cursor-pointer transition shadow"
+                                className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded text-[9px] uppercase tracking-wide cursor-pointer transition shadow flex items-center gap-1"
                               >
-                                🙋‍♂️ Claim Ticket
+                                <DiscordEmoji name="nexus_createticket" sizeClassName="w-3 h-3" />
+                                <span>Claim Ticket</span>
                               </button>
                             )}
                             {activeTicket.status !== 'closed' && (
                               <button
                                 onClick={() => handleTicketAction(activeTicket.id, 'close')}
-                                className="px-2 py-1 bg-slate-900 border border-white/10 hover:bg-slate-800 text-slate-300 font-bold rounded text-[9px] uppercase tracking-wide cursor-pointer transition"
+                                className="px-2 py-1 bg-slate-900 border border-white/10 hover:bg-slate-800 text-slate-300 font-bold rounded text-[9px] uppercase tracking-wide cursor-pointer transition flex items-center gap-1"
                               >
-                                🔒 Close Ticket
+                                <DiscordEmoji name="nexus_ticket" sizeClassName="w-3 h-3" />
+                                <span>Close Ticket</span>
                               </button>
                             )}
                             <button
@@ -881,13 +913,23 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                           {activeTicket.messages.map((msg, i) => (
                             <div key={i} className="flex gap-2.5 text-xs">
                               {msg.sender === 'bot' ? (
-                                <div className="w-7 h-7 rounded bg-[#5865F2]/20 border border-[#5865F2]/30 text-[#5865F2] font-bold flex items-center justify-center text-[10px] shrink-0 font-mono">🤖</div>
+                                <div className="w-7 h-7 rounded bg-[#5865F2]/20 border border-[#5865F2]/30 flex items-center justify-center shrink-0">
+                                  <DiscordEmoji name="nexus_createticket" sizeClassName="w-4 h-4" />
+                                </div>
                               ) : msg.sender === 'moderator' ? (
-                                <div className="w-7 h-7 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-[10px] shrink-0 font-mono">🛡️</div>
+                                <div className="w-7 h-7 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                                  <DiscordEmoji name="nexus_ticket" sizeClassName="w-4 h-4" />
+                                </div>
                               ) : msg.sender === 'system' ? (
-                                <div className="w-7 h-7 rounded bg-slate-800 border border-white/10 text-slate-400 font-bold flex items-center justify-center text-[10px] shrink-0 font-mono">⚙️</div>
+                                <div className="w-7 h-7 rounded bg-slate-800 border border-white/10 flex items-center justify-center shrink-0">
+                                  <DiscordEmoji name="nexus_ticket" sizeClassName="w-3.5 h-3.5" />
+                                </div>
                               ) : (
-                                <div className="w-7 h-7 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center text-[10px] shrink-0 font-mono">👤</div>
+                                <DiscordUserAvatar
+                                  avatarUrl={discordUser?.avatarUrl}
+                                  username={msg.senderName}
+                                  sizeClassName="w-7 h-7"
+                                />
                               )}
                               
                               <div className="flex-1 min-w-0">
@@ -950,7 +992,10 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
       {/* RIGHT COLUMN: LIVELIHOOD DISCORD INTERFACE PREVIEW */}
       <div className="w-full xl:w-[440px] flex flex-col gap-4 shrink-0">
         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display px-1 flex justify-between items-center">
-          <span>🖥️ Live Discord Simulator Preview</span>
+          <div className="flex items-center gap-1.5">
+            <DiscordEmoji name="nexus_createticket" sizeClassName="w-3.5 h-3.5" />
+            <span>Live Discord Simulator Preview</span>
+          </div>
           <span className="text-[9px] font-mono bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/20 font-bold">
             Realtime render
           </span>
@@ -982,7 +1027,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
               {/* Bot Author info */}
               <div className="flex gap-2">
                 <div className="w-8 h-8 rounded-full bg-[#5865F2] text-white font-extrabold flex items-center justify-center text-xs shrink-0 select-none">
-                  N
+                  <DiscordEmoji name="nexus_ticket" sizeClassName="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-1">
@@ -998,9 +1043,10 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                   >
                     <div className="flex justify-between items-start gap-2">
                       <div className="space-y-1">
-                        <h4 className="font-bold text-white text-xs leading-snug">
-                          {activeTab === 'setup' ? currentEmbed.title : activeConfig?.embed.title}
-                        </h4>
+                        <div className="flex items-center gap-1.5 font-bold text-white text-xs leading-snug">
+                          <DiscordEmoji name="nexus_ticket" sizeClassName="w-4 h-4" />
+                          <span>{cleanTitle(activeTab === 'setup' ? currentEmbed.title : activeConfig?.embed.title)}</span>
+                        </div>
                         <p className="text-[10px] text-slate-300 leading-normal whitespace-pre-wrap">
                           {activeTab === 'setup' ? currentEmbed.description : activeConfig?.embed.description}
                         </p>
@@ -1040,7 +1086,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                           }}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4f545c] hover:bg-[#686d73] text-white text-[10px] font-bold rounded shadow transition active:scale-95 cursor-pointer max-w-full"
                         >
-                          <span className="text-xs shrink-0 select-none">{btn.emoji}</span>
+                          <DiscordEmoji name={btn.emoji} sizeClassName="w-4 h-4" />
                           <span className="truncate">{btn.name}</span>
                         </button>
                       );
@@ -1060,7 +1106,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                 {activeTab === 'setup' ? (
                   "Currently in wizard step. Complete the setup to deploy or switch to the Config tab to click active panels, which spawns simulated ticket channels."
                 ) : (
-                  "Click any of the grey buttons on the bot message above! A private ticket channel will open immediately for you in the active simulation window."
+                  "Click any of the Grey action buttons on the bot message above! A private ticket channel will open immediately for you in the active simulation window."
                 )}
               </p>
             </div>
@@ -1069,7 +1115,7 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
         </div>
       </div>
 
-      {/* MODAL overlay: Add Action Button with Emojis */}
+      {/* MODAL overlay: Add Action Button with Custom Emojis */}
       <AnimatePresence>
         {addButtonModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
@@ -1120,22 +1166,25 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
                 />
               </div>
 
-              {/* Button Emoji Selection */}
+              {/* Button Custom Emoji Selection */}
               <div className="space-y-1 text-left">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display block">Button Emoji Icon:</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-display block">Button Custom Emoji Icon:</label>
                 <div className="flex flex-wrap gap-2 p-2.5 bg-slate-950 rounded-lg border border-white/5 justify-center">
                   {EMOJI_OPTIONS.map((emoji) => (
                     <button
                       key={emoji}
                       type="button"
                       onClick={() => setNewBtnEmoji(emoji)}
-                      className={`w-8 h-8 rounded text-sm flex items-center justify-center transition border ${
+                      className={`h-9 px-2.5 rounded text-xs flex items-center gap-1.5 transition border cursor-pointer ${
                         newBtnEmoji === emoji
-                          ? 'bg-[#5865F2]/20 border-[#5865F2] text-white scale-110 font-bold'
+                          ? 'bg-[#5865F2]/20 border-[#5865F2] text-white font-bold'
                           : 'bg-transparent border-transparent hover:bg-white/[0.04] text-slate-300'
                       }`}
                     >
-                      {emoji}
+                      <DiscordEmoji name={emoji} sizeClassName="w-4 h-4" />
+                      <span className="font-mono text-[10px]">
+                        {emoji.includes('createticket') ? 'nexus_createticket' : 'nexus_ticket'}
+                      </span>
                     </button>
                   ))}
                 </div>

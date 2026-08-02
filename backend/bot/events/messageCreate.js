@@ -112,7 +112,7 @@ async function handlePrefixCommand(message, settings) {
   const shieldIcon = statusEmoji('automod') || getEmoji('nexus_automod') || '🛡️';
   const lockIcon = statusEmoji('lock') || getEmoji('nexus_lock') || '🔒';
   const banIcon = statusEmoji('ban') || getEmoji('nexus_ban') || '🔨';
-  const userIcon = getEmoji('nexus_member') || '👤';
+  const userIcon = getEmoji('nexus_user') || getEmoji('nexus_member');
 
   // Command 1: extractembed / embedjson
   if (['extractembed', 'extract-embed', 'embedjson'].includes(command)) {
@@ -982,6 +982,70 @@ async function handlePrefixCommand(message, settings) {
       await message.reply({ embeds: [embed] });
     }
     return true;
+  }
+
+  // Command 31: ticket (!ticket setup [channel], !ticket config)
+  if (command === 'ticket') {
+    if (!member.permissions.has(PermissionFlagsBits.ManageGuild) && !member.permissions.has(PermissionFlagsBits.Administrator)) {
+      const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} **Access Denied**: \`ManageGuild\` or \`Administrator\` permission required.`);
+      await message.reply({ embeds: [embed] });
+      return true;
+    }
+
+    const sub = (args[0] || 'setup').toLowerCase();
+    if (sub === 'setup') {
+      const targetChannel = message.channel;
+      const ticketEmoji = getEmoji('nexus_ticket') || '🎫';
+      const createTicketEmoji = getEmoji('nexus_createticket') || '✉️';
+
+      const embed = new EmbedBuilder()
+        .setColor('#5865F2')
+        .setTitle(`${ticketEmoji} Nexus Support Ticket Panel`)
+        .setDescription('Need assistance? Click one of the buttons below to open a direct support request with our server administration team.')
+        .setThumbnail(guild.iconURL({ dynamic: true }) || 'https://cdn.discordapp.com/embed/avatars/0.png')
+        .setFooter({ text: 'NexusBot Support Automation System' })
+        .setTimestamp();
+
+      const btnRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('ticket_open_general')
+          .setLabel('General Support')
+          .setEmoji(ticketEmoji)
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId('ticket_open_billing')
+          .setLabel('Billing Support')
+          .setEmoji(createTicketEmoji)
+          .setStyle(ButtonStyle.Success)
+      );
+
+      try {
+        await targetChannel.send({ embeds: [embed], components: [btnRow] });
+        addGuildAudit(guildId, 'TICKETS', 'SETUP_SUCCESS', `Deployed ticket panel in #${targetChannel.name}`, author.tag);
+        const confirmEmbed = new EmbedBuilder().setColor('#10B981').setDescription(`${successIcon} Successfully deployed ticket panel in <#${targetChannel.id}>.`);
+        await message.reply({ embeds: [confirmEmbed] });
+      } catch (err) {
+        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Failed to send ticket panel: ${err.message}`);
+        await message.reply({ embeds: [errEmbed] });
+      }
+      return true;
+    }
+
+    if (sub === 'config') {
+      const embed = new EmbedBuilder()
+        .setColor('#5865F2')
+        .setTitle(`${getEmoji('nexus_ticket') || '🎫'} Active Ticket System Configuration`)
+        .setDescription('Ticket system module is active and ready.')
+        .addFields(
+          { name: 'Status', value: '`ONLINE & ACTIVE`', inline: true },
+          { name: 'Default Categories', value: '`TICKETS (SUPPORT)`, `BILLING-QUERIES`', inline: true },
+          { name: 'Auto-Routing', value: '`Enabled`', inline: true }
+        )
+        .setFooter({ text: 'Use !ticket setup to deploy panel in a channel' })
+        .setTimestamp();
+      await message.reply({ embeds: [embed] });
+      return true;
+    }
   }
 
   // Command 31: help

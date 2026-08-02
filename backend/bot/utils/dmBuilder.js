@@ -60,8 +60,8 @@ export function getInitialDmDispatchEmbedAndComponents(sessionId) {
     ? `<@${session.targetUser.id}> (**${session.targetUser.tag || session.targetUser.username}**)`
     : (session?.targetRole ? `<@&${session.targetRole.id}>` : 'Entire Server');
 
-  const msgIcon = getCustomEmoji('nexus_message') || '✉️';
-  const userIcon = getCustomEmoji('nexus_user') || '👤';
+  const msgIcon = getCustomEmoji('nexus_message');
+  const userIcon = getCustomEmoji('nexus_user');
 
   const embed = new EmbedBuilder()
     .setTitle(`${msgIcon} Direct Message`)

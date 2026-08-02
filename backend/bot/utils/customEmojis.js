@@ -55,6 +55,8 @@ export const CUSTOM_EMOJIS = {
   nexus_home: "<:nexus_home:1531200550194909324>",
   nexus_user: "<:nexus_user:1531200622383075398>",
   nexus_stats: "<:nexus_stats:1531200663009366016>",
+  nexus_ticket: "<:nexus_ticket:1533385159678754970>",
+  nexus_createticket: "<:nexus_createticket:1533385194411655310>",
 };
 
 export const CUSTOM_EMOJI_IDS = Object.fromEntries(
