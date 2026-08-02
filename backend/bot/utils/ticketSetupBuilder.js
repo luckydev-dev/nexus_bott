@@ -10,18 +10,19 @@ import {
   ButtonStyle,
   StringSelectMenuBuilder,
   ChannelSelectMenuBuilder,
+  RoleSelectMenuBuilder,
   ChannelType,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle
 } from 'discord.js';
-import { getCustomEmoji, getCustomEmojiObject } from './customEmojis.js';
+import { getCustomEmojiObject } from './customEmojis.js';
 import { resolveEmojiObject } from './statusEmojis.js';
 
 const activeTicketSetupSessions = new Map();
 
 /**
- * Default ticket panel configuration
+ * Creates or resets a ticket setup session.
  */
 export function createTicketSetupSession({ userId, guildId, initialData = null }) {
   const sessionId = `tkt_${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -29,31 +30,21 @@ export function createTicketSetupSession({ userId, guildId, initialData = null }
     sessionId,
     userId,
     guildId,
-    counter: initialData?.counter || 1,
+    step: 1, // 1: Embed Builder, 2: Add Components, 3: Support Settings, 4: Target Channel & Deploy
+    pendingComponent: null, // Temporary storage during modal -> category workflow
     panelData: {
-      title: initialData?.title || '🎫 Nexus Support Ticket Panel',
-      description: initialData?.description || 'Need assistance? Select a button below to open a direct support request with our server administration team.',
+      title: initialData?.panelTitle || 'Support Ticket Panel',
+      description: initialData?.description || 'Select an option below to open a support ticket with our team.',
       color: initialData?.color || '#5865F2',
       thumbnail: initialData?.thumbnail || '',
-      footer: initialData?.footer || 'NexusBot Support Automation System',
-      welcomeMessage: initialData?.welcomeMessage || 'Welcome {user}! Thank you for contacting support. Our staff team has been notified. Please describe your inquiry in detail.',
-      categoryId: initialData?.categoryId || '',
-      buttons: initialData?.buttons || [
-        {
-          id: 'btn_default_1',
-          label: 'General Support',
-          categoryName: 'General Support',
-          emoji: 'nexus_ticket',
-          style: 'Primary'
-        },
-        {
-          id: 'btn_default_2',
-          label: 'Billing Support',
-          categoryName: 'Billing Support',
-          emoji: 'nexus_createticket',
-          style: 'Success'
-        }
-      ]
+      footer: initialData?.footer || 'Support Ticket System',
+      welcomeMessage: initialData?.welcomeMessage || 'Welcome {user}! Thank you for contacting support. Our team has been notified.',
+      logChannelId: initialData?.logChannelId || '',
+      staffRoleId: initialData?.staffRoleId || '',
+      componentType: initialData?.componentType || 'buttons', // 'buttons' or 'menu'
+      buttons: initialData?.buttons || [],
+      menuOptions: initialData?.menuOptions || [],
+      targetChannelId: ''
     }
   };
 
@@ -70,26 +61,46 @@ export function deleteTicketSetupSession(sessionId) {
 }
 
 /**
- * Builds the interactive setup message with live embed preview, field selector, and control buttons.
+ * Main View Renderer for Step-by-Step Ticket Setup Wizard
  */
 export function getTicketSetupBuilderViewAndComponents(sessionId, guild) {
   const session = getTicketSetupSession(sessionId);
   if (!session) return null;
 
+  const { step, panelData } = session;
+
+  if (step === 1) {
+    return buildStep1EmbedBuilderView(sessionId, session, guild);
+  } else if (step === 2) {
+    return buildStep2ComponentsView(sessionId, session, guild);
+  } else if (step === 3) {
+    return buildStep3SettingsView(sessionId, session, guild);
+  } else if (step === 4) {
+    return buildStep4DeployView(sessionId, session, guild);
+  }
+
+  return buildStep1EmbedBuilderView(sessionId, session, guild);
+}
+
+/**
+ * STEP 1: Embed Builder (Live Preview & Field Select Menu)
+ */
+function buildStep1EmbedBuilderView(sessionId, session, guild) {
   const { panelData } = session;
 
-  // 1. Build Preview Embed
   const previewEmbed = new EmbedBuilder()
     .setColor(panelData.color && /^#[0-9A-F]{6}$/i.test(panelData.color) ? panelData.color : '#5865F2');
 
   if (panelData.title && panelData.title.trim()) {
     previewEmbed.setTitle(panelData.title.trim());
   } else {
-    previewEmbed.setTitle('🎫 Support Ticket Panel');
+    previewEmbed.setTitle('Support Ticket Panel');
   }
 
   if (panelData.description && panelData.description.trim()) {
     previewEmbed.setDescription(panelData.description.trim());
+  } else {
+    previewEmbed.setDescription('Click a button below to open a ticket.');
   }
 
   if (panelData.thumbnail && panelData.thumbnail.trim().startsWith('http')) {
@@ -98,41 +109,31 @@ export function getTicketSetupBuilderViewAndComponents(sessionId, guild) {
     } catch (e) {
       // ignore
     }
-  } else if (guild) {
-    const icon = guild.iconURL({ dynamic: true });
-    if (icon) previewEmbed.setThumbnail(icon);
+  } else if (guild?.iconURL({ dynamic: true })) {
+    previewEmbed.setThumbnail(guild.iconURL({ dynamic: true }));
   }
 
   if (panelData.footer && panelData.footer.trim()) {
     previewEmbed.setFooter({ text: panelData.footer.trim() });
   }
+
   previewEmbed.setTimestamp();
 
-  // Add field summary of buttons & welcome message
-  const buttonSummary = panelData.buttons.length > 0
-    ? panelData.buttons.map((b, i) => `${i + 1}. **${b.label}** (Category: \`${b.categoryName || 'Default'}\`)`).join('\n')
-    : '*No custom buttons added yet*';
-
-  previewEmbed.addFields(
-    { name: '📋 Configured Ticket Buttons', value: buttonSummary, inline: false },
-    { name: '💬 Ticket Welcome Message', value: `\`\`\`${panelData.welcomeMessage || 'Default welcome message'}\`\`\``, inline: false }
-  );
-
-  // 2. Select Menu to pick embed field to edit
+  // Select menu for embed properties
   const fieldSelectMenu = new StringSelectMenuBuilder()
     .setCustomId(`tkt_select_field_${sessionId}`)
-    .setPlaceholder('Select embed property to edit...')
+    .setPlaceholder('Select embed property to customize...')
     .addOptions([
       {
         label: 'Edit Title',
         value: 'title',
-        description: 'Set custom title for the ticket panel embed',
+        description: 'Set header title for ticket panel',
         emoji: getCustomEmojiObject('nexus_info') || { name: '📝' }
       },
       {
         label: 'Edit Description',
         value: 'description',
-        description: 'Set ticket panel body text',
+        description: 'Set body text for ticket panel',
         emoji: getCustomEmojiObject('nexus_message') || { name: '💬' }
       },
       {
@@ -142,52 +143,242 @@ export function getTicketSetupBuilderViewAndComponents(sessionId, guild) {
         emoji: getCustomEmojiObject('nexus_settings') || { name: '🎨' }
       },
       {
-        label: 'Edit Welcome Message',
-        value: 'welcomeMessage',
-        description: 'Set message sent inside newly opened ticket channels',
-        emoji: getCustomEmojiObject('nexus_createticket') || { name: '✉️' }
-      },
-      {
         label: 'Edit Thumbnail URL',
         value: 'thumbnail',
-        description: 'Set custom thumbnail image URL',
+        description: 'Set panel image thumbnail URL',
         emoji: getCustomEmojiObject('nexus_link') || { name: '🖼️' }
       },
       {
-        label: 'Edit Footer',
+        label: 'Edit Footer Text',
         value: 'footer',
-        description: 'Set footer text for the embed',
+        description: 'Set panel footer line',
         emoji: getCustomEmojiObject('nexus_info') || { name: '📑' }
       }
     ]);
 
   const rowFieldSelect = new ActionRowBuilder().addComponents(fieldSelectMenu);
 
-  // 3. Action Buttons Row 1 (Add Button, Edit Welcome, Remove Button)
-  const rowButtons1 = new ActionRowBuilder().addComponents(
+  const rowControls = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`tkt_btn_add_${sessionId}`)
-      .setLabel('Add Ticket Button')
+      .setCustomId(`tkt_btn_step1_next_${sessionId}`)
+      .setLabel('Continue to Add Buttons/Menu')
+      .setEmoji(getCustomEmojiObject('nexus_tick') || { name: '➡️' })
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`tkt_btn_cancel_${sessionId}`)
+      .setLabel('Cancel Setup')
+      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '❌' })
+      .setStyle(ButtonStyle.Danger)
+  );
+
+  return {
+    embeds: [previewEmbed],
+    components: [rowFieldSelect, rowControls]
+  };
+}
+
+/**
+ * STEP 2: Add Components (Buttons or Dropdown Menu Options)
+ */
+function buildStep2ComponentsView(sessionId, session, guild) {
+  const { panelData } = session;
+
+  const previewEmbed = new EmbedBuilder()
+    .setColor(panelData.color && /^#[0-9A-F]{6}$/i.test(panelData.color) ? panelData.color : '#5865F2')
+    .setTitle(panelData.title || 'Support Ticket Panel')
+    .setDescription(panelData.description || 'Select an option below to open a ticket.')
+    .setTimestamp();
+
+  if (panelData.thumbnail) previewEmbed.setThumbnail(panelData.thumbnail);
+  if (panelData.footer) previewEmbed.setFooter({ text: panelData.footer });
+
+  // Summary of added components
+  const buttonsSummary = panelData.buttons && panelData.buttons.length > 0
+    ? panelData.buttons.map((b, i) => `${i + 1}. Button: **${b.label}** -> Category: \`${b.categoryName || 'Default'}\``).join('\n')
+    : '*No custom buttons added*';
+
+  const menuSummary = panelData.menuOptions && panelData.menuOptions.length > 0
+    ? panelData.menuOptions.map((m, i) => `${i + 1}. Option: **${m.label}** -> Category: \`${m.categoryName || 'Default'}\``).join('\n')
+    : '*No dropdown options added*';
+
+  previewEmbed.addFields(
+    { name: 'Configured Action Buttons', value: buttonsSummary, inline: false },
+    { name: 'Configured Dropdown Options', value: menuSummary, inline: false }
+  );
+
+  const rowAddComponents = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`tkt_btn_add_button_${sessionId}`)
+      .setLabel('Add Button')
       .setEmoji(getCustomEmojiObject('nexus_ticket') || { name: '➕' })
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId(`tkt_btn_welcome_${sessionId}`)
-      .setLabel('Edit Welcome Msg')
-      .setEmoji(getCustomEmojiObject('nexus_createticket') || { name: '💬' })
-      .setStyle(ButtonStyle.Secondary),
+      .setCustomId(`tkt_btn_add_menu_${sessionId}`)
+      .setLabel('Add Dropdown Option')
+      .setEmoji(getCustomEmojiObject('nexus_createticket') || { name: '🔽' })
+      .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId(`tkt_btn_clear_btns_${sessionId}`)
-      .setLabel('Reset Buttons')
+      .setCustomId(`tkt_btn_clear_components_${sessionId}`)
+      .setLabel('Reset Components')
       .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '🗑️' })
       .setStyle(ButtonStyle.Secondary)
   );
 
-  // 4. Action Buttons Row 2 (Target Channel / Category Select, Deploy, Cancel)
-  const categorySelectMenu = new StringSelectMenuBuilder()
-    .setCustomId(`tkt_select_category_${sessionId}`)
-    .setPlaceholder('Select Discord Category for ticket channels...');
+  const rowControls = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`tkt_btn_step2_next_${sessionId}`)
+      .setLabel('Continue to Settings')
+      .setEmoji(getCustomEmojiObject('nexus_tick') || { name: '➡️' })
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`tkt_btn_step2_back_${sessionId}`)
+      .setLabel('Back to Embed Builder')
+      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '⬅️' })
+      .setStyle(ButtonStyle.Secondary)
+  );
 
-  // Get categories from guild
+  return {
+    embeds: [previewEmbed],
+    components: [rowAddComponents, rowControls]
+  };
+}
+
+/**
+ * STEP 3: Support Settings (Welcome Message, Log Channel, Staff Roles)
+ */
+function buildStep3SettingsView(sessionId, session, guild) {
+  const { panelData } = session;
+
+  const settingsEmbed = new EmbedBuilder()
+    .setColor(panelData.color && /^#[0-9A-F]{6}$/i.test(panelData.color) ? panelData.color : '#5865F2')
+    .setTitle('Support Ticket Configuration & Automation Settings')
+    .setDescription('Customize welcome messages, audit logs, and support team role permissions below.')
+    .addFields(
+      {
+        name: 'Ticket Welcome Message',
+        value: `\`\`\`${panelData.welcomeMessage || 'Welcome {user}! Thank you for contacting support.'}\`\`\``,
+        inline: false
+      },
+      {
+        name: 'Log Channel',
+        value: panelData.logChannelId ? `<#${panelData.logChannelId}>` : '*Not configured*',
+        inline: true
+      },
+      {
+        name: 'Staff Support Role',
+        value: panelData.staffRoleId ? `<@&${panelData.staffRoleId}>` : '*Not configured*',
+        inline: true
+      }
+    )
+    .setTimestamp();
+
+  const rowEditWelcome = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`tkt_btn_edit_welcome_${sessionId}`)
+      .setLabel('Edit Welcome Message')
+      .setEmoji(getCustomEmojiObject('nexus_createticket') || { name: '💬' })
+      .setStyle(ButtonStyle.Primary)
+  );
+
+  const rowLogChannelSelect = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId(`tkt_select_log_channel_${sessionId}`)
+      .setPlaceholder('Select log channel for ticket events...')
+      .setChannelTypes(ChannelType.GuildText)
+  );
+
+  const rowStaffRoleSelect = new ActionRowBuilder().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId(`tkt_select_staff_role_${sessionId}`)
+      .setPlaceholder('Select staff support role to manage tickets...')
+  );
+
+  const rowControls = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`tkt_btn_step3_next_${sessionId}`)
+      .setLabel('Continue to Target Channel')
+      .setEmoji(getCustomEmojiObject('nexus_tick') || { name: '➡️' })
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`tkt_btn_step3_back_${sessionId}`)
+      .setLabel('Back to Components')
+      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '⬅️' })
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  return {
+    embeds: [settingsEmbed],
+    components: [rowEditWelcome, rowLogChannelSelect, rowStaffRoleSelect, rowControls]
+  };
+}
+
+/**
+ * STEP 4: Target Channel Selection & Deployment
+ */
+function buildStep4DeployView(sessionId, session, guild) {
+  const { panelData } = session;
+
+  const deployEmbed = new EmbedBuilder()
+    .setColor(panelData.color && /^#[0-9A-F]{6}$/i.test(panelData.color) ? panelData.color : '#5865F2')
+    .setTitle('Select Deployment Channel')
+    .setDescription('Select the target channel where the interactive ticket panel should be sent.')
+    .addFields(
+      {
+        name: 'Selected Target Channel',
+        value: panelData.targetChannelId ? `<#${panelData.targetChannelId}>` : '*Please select a channel below*',
+        inline: false
+      },
+      {
+        name: 'Panel Summary',
+        value: `Title: \`${panelData.title}\` | Components: \`${panelData.buttons.length} buttons, ${panelData.menuOptions.length} menu options\``,
+        inline: false
+      }
+    )
+    .setTimestamp();
+
+  const rowChannelSelect = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId(`tkt_select_deploy_channel_${sessionId}`)
+      .setPlaceholder('Select channel to send ticket panel into...')
+      .setChannelTypes(ChannelType.GuildText)
+  );
+
+  const rowControls = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`tkt_btn_deploy_now_${sessionId}`)
+      .setLabel('Send Ticket Panel')
+      .setEmoji(getCustomEmojiObject('nexus_tick') || { name: '🚀' })
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`tkt_btn_step4_back_${sessionId}`)
+      .setLabel('Back to Settings')
+      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '⬅️' })
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  return {
+    embeds: [deployEmbed],
+    components: [rowChannelSelect, rowControls]
+  };
+}
+
+/**
+ * View when asking user to pick a category after modal submit
+ */
+export function buildCategorySelectForComponentView(sessionId, guild, componentLabel) {
+  const session = getTicketSetupSession(sessionId);
+  if (!session) return null;
+
+  const embed = new EmbedBuilder()
+    .setColor('#5865F2')
+    .setTitle('Select Category Channel for Ticket Routing')
+    .setDescription(`Select the Discord Category channel where ticket channels created via **"${componentLabel}"** should be placed.`)
+    .setTimestamp();
+
+  const categorySelectMenu = new StringSelectMenuBuilder()
+    .setCustomId(`tkt_select_component_category_${sessionId}`)
+    .setPlaceholder('Select category channel...');
+
   const categories = guild ? Array.from(guild.channels.cache.filter(c => c.type === ChannelType.GuildCategory).values()) : [];
   if (categories.length > 0) {
     categorySelectMenu.addOptions(
@@ -195,14 +386,13 @@ export function getTicketSetupBuilderViewAndComponents(sessionId, guild) {
         label: cat.name,
         value: cat.id,
         description: `Route created ticket channels into ${cat.name}`,
-        default: panelData.categoryId === cat.id,
         emoji: { name: '📁' }
       }))
     );
   } else {
     categorySelectMenu.addOptions([
       {
-        label: 'Default Server Category',
+        label: 'Default Category',
         value: 'default',
         description: 'Auto-create tickets at top of server channel list',
         emoji: { name: '📁' }
@@ -210,29 +400,16 @@ export function getTicketSetupBuilderViewAndComponents(sessionId, guild) {
     ]);
   }
 
-  const rowCategorySelect = new ActionRowBuilder().addComponents(categorySelectMenu);
-
-  const rowButtons2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`tkt_btn_deploy_${sessionId}`)
-      .setLabel('Deploy Ticket Panel')
-      .setEmoji(getCustomEmojiObject('nexus_tick') || { name: '🚀' })
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId(`tkt_btn_cancel_${sessionId}`)
-      .setLabel('Cancel')
-      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '❌' })
-      .setStyle(ButtonStyle.Danger)
-  );
+  const row = new ActionRowBuilder().addComponents(categorySelectMenu);
 
   return {
-    embeds: [previewEmbed],
-    components: [rowFieldSelect, rowButtons1, rowCategorySelect, rowButtons2]
+    embeds: [embed],
+    components: [row]
   };
 }
 
 /**
- * Creates modal for editing single string fields (Title, Color, Welcome, etc.)
+ * Modal for single string embed field customization
  */
 export function createTicketFieldModal(sessionId, fieldName, currentValue = '') {
   const modal = new ModalBuilder()
@@ -243,7 +420,7 @@ export function createTicketFieldModal(sessionId, fieldName, currentValue = '') 
     title: 'Panel Title',
     description: 'Panel Description',
     color: 'Hex Color Code (e.g. #5865F2)',
-    welcomeMessage: 'Ticket Welcome Message (Use {user} for mention)',
+    welcomeMessage: 'Ticket Welcome Message (Use {user} for user mention)',
     thumbnail: 'Thumbnail Image URL',
     footer: 'Footer Text'
   };
@@ -263,26 +440,18 @@ export function createTicketFieldModal(sessionId, fieldName, currentValue = '') 
 }
 
 /**
- * Creates modal for adding a new ticket action button
+ * Modal for adding a ticket button
  */
 export function createAddTicketButtonModal(sessionId) {
   const modal = new ModalBuilder()
     .setCustomId(`tkt_modal_add_button_${sessionId}`)
     .setTitle('Add Ticket Category Button');
 
-  const nameInput = new TextInputBuilder()
+  const labelInput = new TextInputBuilder()
     .setCustomId('button_label')
     .setLabel('Button Label (e.g., General Support)')
     .setStyle(TextInputStyle.Short)
     .setPlaceholder('e.g. Technical Support')
-    .setRequired(true)
-    .setMaxLength(80);
-
-  const catInput = new TextInputBuilder()
-    .setCustomId('category_name')
-    .setLabel('Category Name (e.g., Support Queries)')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g. TECH-HELP')
     .setRequired(true)
     .setMaxLength(80);
 
@@ -294,8 +463,47 @@ export function createAddTicketButtonModal(sessionId) {
     .setRequired(false);
 
   modal.addComponents(
-    new ActionRowBuilder().addComponents(nameInput),
-    new ActionRowBuilder().addComponents(catInput),
+    new ActionRowBuilder().addComponents(labelInput),
+    new ActionRowBuilder().addComponents(emojiInput)
+  );
+
+  return modal;
+}
+
+/**
+ * Modal for adding a select menu option
+ */
+export function createAddTicketMenuOptionModal(sessionId) {
+  const modal = new ModalBuilder()
+    .setCustomId(`tkt_modal_add_menu_option_${sessionId}`)
+    .setTitle('Add Dropdown Select Menu Option');
+
+  const labelInput = new TextInputBuilder()
+    .setCustomId('option_label')
+    .setLabel('Option Label (e.g., General Inquiry)')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('e.g. Report a Member')
+    .setRequired(true)
+    .setMaxLength(80);
+
+  const descInput = new TextInputBuilder()
+    .setCustomId('option_desc')
+    .setLabel('Option Description')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('e.g. Submit a confidential report to admins')
+    .setRequired(false)
+    .setMaxLength(100);
+
+  const emojiInput = new TextInputBuilder()
+    .setCustomId('option_emoji')
+    .setLabel('Emoji Name/Icon')
+    .setStyle(TextInputStyle.Short)
+    .setValue('nexus_ticket')
+    .setRequired(false);
+
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(labelInput),
+    new ActionRowBuilder().addComponents(descInput),
     new ActionRowBuilder().addComponents(emojiInput)
   );
 
