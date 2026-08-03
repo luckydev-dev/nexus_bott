@@ -280,6 +280,73 @@ function buildStep2ComponentsView(sessionId, session, guild) {
  */
 function buildStep3SettingsView(sessionId, session, guild) {
   const { panelData } = session;
+  const components = [];
+
+  // If actively configuring a specific field, show a clean, simplified menu-specific screen
+  if (session.activeConfigField === 'log_channel') {
+    const logEmbed = new EmbedBuilder()
+      .setColor('#5865F2')
+      .setTitle('Configure Log Channel')
+      .setDescription('Please select the text channel from the menu below to receive ticket audit logs.');
+
+    const logSelect = new ChannelSelectMenuBuilder()
+      .setCustomId(`tkt_select_log_channel_${sessionId}`)
+      .setPlaceholder('Select log channel for ticket events...')
+      .setChannelTypes(ChannelType.GuildText);
+
+    components.push(new ActionRowBuilder().addComponents(logSelect));
+
+    const rowControls = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`tkt_btn_step3_cancel_config_${sessionId}`)
+        .setLabel('Go Back')
+        .setEmoji(getCustomEmojiObject('nexus_cross') || undefined)
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`tkt_btn_cancel_${sessionId}`)
+        .setLabel('Cancel Setup')
+        .setEmoji(getCustomEmojiObject('nexus_cross') || undefined)
+        .setStyle(ButtonStyle.Danger)
+    );
+    components.push(rowControls);
+
+    return {
+      embeds: [logEmbed],
+      components
+    };
+  }
+
+  if (session.activeConfigField === 'staff_role') {
+    const roleEmbed = new EmbedBuilder()
+      .setColor('#5865F2')
+      .setTitle('Configure Staff Support Role')
+      .setDescription('Please select the role from the menu below that is authorized to manage and claim support tickets.');
+
+    const roleSelect = new RoleSelectMenuBuilder()
+      .setCustomId(`tkt_select_staff_role_${sessionId}`)
+      .setPlaceholder('Select staff support role to manage tickets...');
+
+    components.push(new ActionRowBuilder().addComponents(roleSelect));
+
+    const rowControls = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`tkt_btn_step3_cancel_config_${sessionId}`)
+        .setLabel('Go Back')
+        .setEmoji(getCustomEmojiObject('nexus_cross') || undefined)
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(`tkt_btn_cancel_${sessionId}`)
+        .setLabel('Cancel Setup')
+        .setEmoji(getCustomEmojiObject('nexus_cross') || undefined)
+        .setStyle(ButtonStyle.Danger)
+    );
+    components.push(rowControls);
+
+    return {
+      embeds: [roleEmbed],
+      components
+    };
+  }
 
   const settingsEmbed = new EmbedBuilder()
     .setColor(panelData.color && /^#[0-9A-F]{6}$/i.test(panelData.color) ? panelData.color : '#5865F2')
@@ -328,23 +395,7 @@ function buildStep3SettingsView(sessionId, session, guild) {
       }
     ]);
 
-  const components = [];
   components.push(new ActionRowBuilder().addComponents(configSelectMenu));
-
-  if (session.activeConfigField === 'log_channel') {
-    const logSelect = new ChannelSelectMenuBuilder()
-      .setCustomId(`tkt_select_log_channel_${sessionId}`)
-      .setPlaceholder('Select log channel for ticket events...')
-      .setChannelTypes(ChannelType.GuildText);
-    components.push(new ActionRowBuilder().addComponents(logSelect));
-  }
-
-  if (session.activeConfigField === 'staff_role') {
-    const roleSelect = new RoleSelectMenuBuilder()
-      .setCustomId(`tkt_select_staff_role_${sessionId}`)
-      .setPlaceholder('Select staff support role to manage tickets...');
-    components.push(new ActionRowBuilder().addComponents(roleSelect));
-  }
 
   const rowControls = new ActionRowBuilder().addComponents(
     new ButtonBuilder()

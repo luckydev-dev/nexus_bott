@@ -2175,6 +2175,15 @@ export default async function handleInteraction(interaction) {
         return interaction.update({ embeds: view.embeds, components: view.components });
       }
     }
+    if (customId.startsWith('tkt_btn_step3_cancel_config_')) {
+      const sessionId = customId.replace('tkt_btn_step3_cancel_config_', '');
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
+      if (session) {
+        session.activeConfigField = null;
+        const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
+        return interaction.update({ embeds: view.embeds, components: view.components });
+      }
+    }
     if (customId.startsWith('tkt_btn_step3_next_')) {
       const sessionId = customId.replace('tkt_btn_step3_next_', '');
       const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);

@@ -42,6 +42,16 @@ export {
  * Create and initialize the Discord Client.
  */
 export function initializeDiscordBot() {
+  // Prevent the Discord bot from running in the AI Studio Live Preview or Shared App Containers
+  const isLivePreviewOrShared = process.env.APPLET_ID || 
+    (process.env.K_SERVICE && (process.env.K_SERVICE.includes('ais-dev') || process.env.K_SERVICE.includes('ais-pre'))) ||
+    (process.env.APP_URL && (process.env.APP_URL.includes('ais-dev') || process.env.APP_URL.includes('ais-pre') || process.env.APP_URL.includes('run.app')));
+
+  if (isLivePreviewOrShared) {
+    console.log('[NexusBot SDK] Running in Live Preview or Shared App Container. Preventing Discord bot startup to avoid duplicate active sessions.');
+    return null;
+  }
+
   const token = process.env.DISCORD_BOT_TOKEN;
   if (!token) {
     console.log('[NexusBot SDK] DISCORD_BOT_TOKEN is missing. Bot module is running inside live Dashboard sandbox simulation.');
