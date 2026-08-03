@@ -160,31 +160,31 @@ function buildStep1EmbedBuilderView(sessionId, session, guild) {
         label: 'Edit Title',
         value: 'title',
         description: 'Set header title for ticket panel',
-        emoji: getCustomEmojiObject('nexus_info') || { name: '📝' }
+        emoji: getCustomEmojiObject('nexus_info') || undefined
       },
       {
         label: 'Edit Description',
         value: 'description',
         description: 'Set body text for ticket panel',
-        emoji: getCustomEmojiObject('nexus_message') || { name: '💬' }
+        emoji: getCustomEmojiObject('nexus_message') || undefined
       },
       {
         label: 'Edit Accent Color',
         value: 'color',
         description: 'Set hex color code (e.g. #5865F2)',
-        emoji: getCustomEmojiObject('nexus_settings') || { name: '🎨' }
+        emoji: getCustomEmojiObject('nexus_settings') || undefined
       },
       {
         label: 'Edit Thumbnail URL',
         value: 'thumbnail',
         description: 'Set panel image thumbnail URL',
-        emoji: getCustomEmojiObject('nexus_link') || { name: '🖼️' }
+        emoji: getCustomEmojiObject('nexus_link') || undefined
       },
       {
         label: 'Edit Footer Text',
         value: 'footer',
         description: 'Set panel footer line',
-        emoji: getCustomEmojiObject('nexus_info') || { name: '📑' }
+        emoji: getCustomEmojiObject('nexus_info') || undefined
       }
     ]);
 
@@ -194,12 +194,12 @@ function buildStep1EmbedBuilderView(sessionId, session, guild) {
     new ButtonBuilder()
       .setCustomId(`tkt_btn_step1_next_${sessionId}`)
       .setLabel('Continue to Add Buttons/Menu')
-      .setEmoji(getCustomEmojiObject('nexus_tick') || { name: '➡️' })
+      .setEmoji(getCustomEmojiObject('nexus_tick') || undefined)
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`tkt_btn_cancel_${sessionId}`)
       .setLabel('Cancel Setup')
-      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '❌' })
+      .setEmoji(getCustomEmojiObject('nexus_cross') || undefined)
       .setStyle(ButtonStyle.Danger)
   );
 
@@ -242,17 +242,17 @@ function buildStep2ComponentsView(sessionId, session, guild) {
     new ButtonBuilder()
       .setCustomId(`tkt_btn_add_button_${sessionId}`)
       .setLabel('Add Button')
-      .setEmoji(getCustomEmojiObject('nexus_ticket') || { name: '➕' })
+      .setEmoji(getCustomEmojiObject('nexus_ticket') || undefined)
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(`tkt_btn_add_menu_${sessionId}`)
       .setLabel('Add Dropdown Option')
-      .setEmoji(getCustomEmojiObject('nexus_createticket') || { name: '🔽' })
+      .setEmoji(getCustomEmojiObject('nexus_createticket') || undefined)
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(`tkt_btn_clear_components_${sessionId}`)
       .setLabel('Reset Components')
-      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '🗑️' })
+      .setEmoji(getCustomEmojiObject('nexus_cross') || undefined)
       .setStyle(ButtonStyle.Secondary)
   );
 
@@ -260,12 +260,12 @@ function buildStep2ComponentsView(sessionId, session, guild) {
     new ButtonBuilder()
       .setCustomId(`tkt_btn_step2_next_${sessionId}`)
       .setLabel('Continue to Settings')
-      .setEmoji(getCustomEmojiObject('nexus_tick') || { name: '➡️' })
+      .setEmoji(getCustomEmojiObject('nexus_tick') || undefined)
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`tkt_btn_step2_back_${sessionId}`)
       .setLabel('Back to Embed Builder')
-      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '⬅️' })
+      .setEmoji(getCustomEmojiObject('nexus_cross') || undefined)
       .setStyle(ButtonStyle.Secondary)
   );
 
@@ -304,43 +304,70 @@ function buildStep3SettingsView(sessionId, session, guild) {
     )
     .setTimestamp();
 
-  const rowEditWelcome = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`tkt_btn_edit_welcome_${sessionId}`)
-      .setLabel('Edit Welcome Message')
-      .setEmoji(getCustomEmojiObject('nexus_createticket') || { name: '💬' })
-      .setStyle(ButtonStyle.Primary)
-  );
+  const configSelectMenu = new StringSelectMenuBuilder()
+    .setCustomId(`tkt_step3_config_select_${sessionId}`)
+    .setPlaceholder('Select a setting to configure...')
+    .addOptions([
+      {
+        label: 'Edit Welcome Message',
+        value: 'welcome_msg',
+        description: 'Set custom greeting message shown in opened tickets',
+        emoji: getCustomEmojiObject('nexus_message') || undefined
+      },
+      {
+        label: 'Configure Log Channel',
+        value: 'log_channel',
+        description: 'Set audit log channel for ticket actions',
+        emoji: getCustomEmojiObject('nexus_logs') || undefined
+      },
+      {
+        label: 'Configure Staff Support Role',
+        value: 'staff_role',
+        description: 'Set role authorized to claim/manage tickets',
+        emoji: getCustomEmojiObject('nexus_roles') || undefined
+      }
+    ]);
 
-  const rowLogChannelSelect = new ActionRowBuilder().addComponents(
-    new ChannelSelectMenuBuilder()
+  const components = [];
+  components.push(new ActionRowBuilder().addComponents(configSelectMenu));
+
+  if (session.activeConfigField === 'log_channel') {
+    const logSelect = new ChannelSelectMenuBuilder()
       .setCustomId(`tkt_select_log_channel_${sessionId}`)
       .setPlaceholder('Select log channel for ticket events...')
-      .setChannelTypes(ChannelType.GuildText)
-  );
+      .setChannelTypes(ChannelType.GuildText);
+    components.push(new ActionRowBuilder().addComponents(logSelect));
+  }
 
-  const rowStaffRoleSelect = new ActionRowBuilder().addComponents(
-    new RoleSelectMenuBuilder()
+  if (session.activeConfigField === 'staff_role') {
+    const roleSelect = new RoleSelectMenuBuilder()
       .setCustomId(`tkt_select_staff_role_${sessionId}`)
-      .setPlaceholder('Select staff support role to manage tickets...')
-  );
+      .setPlaceholder('Select staff support role to manage tickets...');
+    components.push(new ActionRowBuilder().addComponents(roleSelect));
+  }
 
   const rowControls = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`tkt_btn_step3_next_${sessionId}`)
       .setLabel('Continue to Target Channel')
-      .setEmoji(getCustomEmojiObject('nexus_tick') || { name: '➡️' })
+      .setEmoji(getCustomEmojiObject('nexus_tick') || undefined)
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`tkt_btn_step3_back_${sessionId}`)
       .setLabel('Back to Components')
-      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '⬅️' })
-      .setStyle(ButtonStyle.Secondary)
+      .setEmoji(getCustomEmojiObject('nexus_cross') || undefined)
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`tkt_btn_cancel_${sessionId}`)
+      .setLabel('Cancel Setup')
+      .setEmoji(getCustomEmojiObject('nexus_cross') || undefined)
+      .setStyle(ButtonStyle.Danger)
   );
+  components.push(rowControls);
 
   return {
     embeds: [settingsEmbed],
-    components: [rowEditWelcome, rowLogChannelSelect, rowStaffRoleSelect, rowControls]
+    components
   };
 }
 
@@ -379,13 +406,18 @@ function buildStep4DeployView(sessionId, session, guild) {
     new ButtonBuilder()
       .setCustomId(`tkt_btn_deploy_now_${sessionId}`)
       .setLabel('Send Ticket Panel')
-      .setEmoji(getCustomEmojiObject('nexus_tick') || { name: '🚀' })
+      .setEmoji(getCustomEmojiObject('nexus_tick') || undefined)
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId(`tkt_btn_step4_back_${sessionId}`)
       .setLabel('Back to Settings')
-      .setEmoji(getCustomEmojiObject('nexus_cross') || { name: '⬅️' })
-      .setStyle(ButtonStyle.Secondary)
+      .setEmoji(getCustomEmojiObject('nexus_cross') || undefined)
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`tkt_btn_cancel_${sessionId}`)
+      .setLabel('Cancel Setup')
+      .setEmoji(getCustomEmojiObject('nexus_cross') || undefined)
+      .setStyle(ButtonStyle.Danger)
   );
 
   return {
@@ -418,7 +450,7 @@ export function buildCategorySelectForComponentView(sessionId, guild, componentL
         label: cat.name,
         value: cat.id,
         description: `Route created ticket channels into ${cat.name}`,
-        emoji: { name: '📁' }
+        emoji: getCustomEmojiObject('nexus_settings') || undefined
       }))
     );
   } else {
@@ -427,7 +459,7 @@ export function buildCategorySelectForComponentView(sessionId, guild, componentL
         label: 'Default Category',
         value: 'default',
         description: 'Auto-create tickets at top of server channel list',
-        emoji: { name: '📁' }
+        emoji: getCustomEmojiObject('nexus_settings') || undefined
       }
     ]);
   }
@@ -489,7 +521,7 @@ export function createAddTicketButtonModal(sessionId) {
 
   const emojiInput = new TextInputBuilder()
     .setCustomId('button_emoji')
-    .setLabel('Emoji Name/Icon (nexus_ticket, nexus_createticket)')
+    .setLabel('Emoji Name (e.g. nexus_ticket)')
     .setStyle(TextInputStyle.Short)
     .setValue('nexus_ticket')
     .setRequired(false);
@@ -528,7 +560,7 @@ export function createAddTicketMenuOptionModal(sessionId) {
 
   const emojiInput = new TextInputBuilder()
     .setCustomId('option_emoji')
-    .setLabel('Emoji Name/Icon')
+    .setLabel('Emoji Name (e.g. nexus_ticket)')
     .setStyle(TextInputStyle.Short)
     .setValue('nexus_ticket')
     .setRequired(false);
