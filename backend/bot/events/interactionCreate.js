@@ -2036,7 +2036,7 @@ export default async function handleInteraction(interaction) {
 
         await ticketChannel.send({ content: `<@${interaction.user.id}>`, embeds: [welcomeEmbed], components: [actionRow] });
 
-        if (ticketConfig.logChannelId) {
+        if (ticketConfig.logChannelId && ticketConfig.logChannelId !== interaction.channelId) {
           const logChan = interaction.guild.channels.cache.get(ticketConfig.logChannelId);
           if (logChan) {
             const logEmbed = new EmbedBuilder()
@@ -2045,6 +2045,14 @@ export default async function handleInteraction(interaction) {
               .setDescription(`Ticket <#${ticketChannel.id}> opened by <@${interaction.user.id}> for **${selectedOpt.label}**.`);
             logChan.send({ embeds: [logEmbed] }).catch(() => {});
           }
+        }
+
+        // Edit original panel message to reset select menu state
+        if (interaction.message && typeof interaction.message.edit === 'function') {
+          await interaction.message.edit({
+            embeds: interaction.message.embeds,
+            components: interaction.message.components
+          }).catch(() => {});
         }
 
         const replyEmbed = new EmbedBuilder().setColor('#10B981').setDescription(`${getCustomEmoji('nexus_tick') || '[Success]'} Support ticket created: <#${ticketChannel.id}>`);
