@@ -1893,7 +1893,7 @@ export default async function handleInteraction(interaction) {
     if (customId.startsWith('tkt_select_field_')) {
       const sessionId = customId.replace('tkt_select_field_', '');
       const fieldName = values[0];
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -1905,7 +1905,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_select_category_')) {
       const sessionId = customId.replace('tkt_select_category_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
         return interaction.update({ embeds: [embed], components: [] });
@@ -1919,7 +1919,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_select_component_category_')) {
       const sessionId = customId.replace('tkt_select_component_category_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
         return interaction.update({ embeds: [embed], components: [] });
@@ -2084,7 +2084,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_select_log_channel_')) {
       const sessionId = customId.replace('tkt_select_log_channel_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (session) {
         session.panelData.logChannelId = values[0];
         const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
@@ -2093,7 +2093,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_select_deploy_channel_')) {
       const sessionId = customId.replace('tkt_select_deploy_channel_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (session) {
         session.panelData.targetChannelId = values[0];
         const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
@@ -2104,7 +2104,7 @@ export default async function handleInteraction(interaction) {
     const { customId, values } = interaction;
     if (customId.startsWith('tkt_select_staff_role_')) {
       const sessionId = customId.replace('tkt_select_staff_role_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (session) {
         session.panelData.staffRoleId = values[0];
         const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
@@ -2117,7 +2117,7 @@ export default async function handleInteraction(interaction) {
     // Handle ticket setup builder navigation & actions
     if (customId.startsWith('tkt_btn_step1_next_')) {
       const sessionId = customId.replace('tkt_btn_step1_next_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (session) {
         session.step = 2;
         const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
@@ -2126,7 +2126,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_btn_step2_back_')) {
       const sessionId = customId.replace('tkt_btn_step2_back_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (session) {
         session.step = 1;
         const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
@@ -2135,7 +2135,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_btn_step2_next_')) {
       const sessionId = customId.replace('tkt_btn_step2_next_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (session) {
         session.step = 3;
         const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
@@ -2144,7 +2144,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_btn_step3_back_')) {
       const sessionId = customId.replace('tkt_btn_step3_back_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (session) {
         session.step = 2;
         const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
@@ -2153,7 +2153,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_btn_step3_next_')) {
       const sessionId = customId.replace('tkt_btn_step3_next_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (session) {
         session.step = 4;
         const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
@@ -2162,7 +2162,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_btn_step4_back_')) {
       const sessionId = customId.replace('tkt_btn_step4_back_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (session) {
         session.step = 3;
         const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
@@ -2171,7 +2171,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_btn_add_button_')) {
       const sessionId = customId.replace('tkt_btn_add_button_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -2181,7 +2181,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_btn_add_menu_')) {
       const sessionId = customId.replace('tkt_btn_add_menu_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -2191,7 +2191,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_btn_clear_components_')) {
       const sessionId = customId.replace('tkt_btn_clear_components_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (session) {
         session.panelData.buttons = [];
         session.panelData.menuOptions = [];
@@ -2201,7 +2201,7 @@ export default async function handleInteraction(interaction) {
     }
     if (customId.startsWith('tkt_btn_edit_welcome_')) {
       const sessionId = customId.replace('tkt_btn_edit_welcome_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -2736,7 +2736,7 @@ export default async function handleInteraction(interaction) {
 
     if (customId.startsWith('tkt_modal_add_button_')) {
       const sessionId = customId.replace('tkt_modal_add_button_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -2757,7 +2757,7 @@ export default async function handleInteraction(interaction) {
 
     if (customId.startsWith('tkt_modal_add_menu_option_')) {
       const sessionId = customId.replace('tkt_modal_add_menu_option_', '');
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
@@ -2784,7 +2784,7 @@ export default async function handleInteraction(interaction) {
       const fieldName = parts[0];
       const sessionId = parts.slice(1).join('_');
 
-      const session = getTicketSetupSession(sessionId);
+      const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });

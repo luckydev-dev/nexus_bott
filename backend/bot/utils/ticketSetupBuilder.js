@@ -52,8 +52,40 @@ export function createTicketSetupSession({ userId, guildId, initialData = null }
   return sessionId;
 }
 
-export function getTicketSetupSession(sessionId) {
-  return activeTicketSetupSessions.get(sessionId);
+export function getTicketSetupSession(sessionId, fallbackGuildId = null, fallbackUserId = null) {
+  if (sessionId && activeTicketSetupSessions.has(sessionId)) {
+    return activeTicketSetupSessions.get(sessionId);
+  }
+
+  if (sessionId && typeof sessionId === 'string' && sessionId.startsWith('tkt_')) {
+    const parts = sessionId.split('_');
+    const userId = fallbackUserId || (parts.length >= 2 ? parts[1] : 'unknown');
+    const session = {
+      sessionId,
+      userId,
+      guildId: fallbackGuildId || '',
+      step: 1,
+      pendingComponent: null,
+      panelData: {
+        title: 'Support Ticket Panel',
+        description: 'Select an option below to open a support ticket with our team.',
+        color: '#5865F2',
+        thumbnail: '',
+        footer: 'Support Ticket System',
+        welcomeMessage: 'Welcome {user}! Thank you for contacting support. Our team has been notified.',
+        logChannelId: '',
+        staffRoleId: '',
+        componentType: 'buttons',
+        buttons: [],
+        menuOptions: [],
+        targetChannelId: ''
+      }
+    };
+    activeTicketSetupSessions.set(sessionId, session);
+    return session;
+  }
+
+  return null;
 }
 
 export function deleteTicketSetupSession(sessionId) {
