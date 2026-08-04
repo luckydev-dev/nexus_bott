@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, AttachmentBuilder, ChannelType } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, AttachmentBuilder, ChannelType, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { ensureGuildStorage, getGuildSettings, saveGuildSettings, addGuildAudit, DATA_DIR } from '../storage.js';
 import { issueWarning } from '../utils/warnings.js';
 import { statusEmoji, statusEmojiObject } from '../utils/statusEmojis.js';
@@ -41,6 +41,52 @@ import {
 } from '../utils/ticketSetupBuilder.js';
 import fs from 'fs';
 import path from 'path';
+
+/**
+ * Helper functions to persist and retrieve live ticket data.
+ */
+function saveLiveTicket(guildId, ticketData) {
+  ensureGuildStorage(guildId);
+  const filePath = path.join(DATA_DIR, guildId, 'tickets_live.json');
+  try {
+    let tickets = [];
+    if (fs.existsSync(filePath)) {
+      tickets = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
+    tickets.push(ticketData);
+    fs.writeFileSync(filePath, JSON.stringify(tickets, null, 2));
+  } catch (err) {
+    console.error('Error saving live ticket:', err);
+  }
+}
+
+function getLiveTicket(guildId, channelId) {
+  ensureGuildStorage(guildId);
+  const filePath = path.join(DATA_DIR, guildId, 'tickets_live.json');
+  try {
+    if (fs.existsSync(filePath)) {
+      const tickets = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      return tickets.find(t => t.channelId === channelId);
+    }
+  } catch (err) {
+    console.error('Error reading live ticket:', err);
+  }
+  return null;
+}
+
+function removeLiveTicket(guildId, channelId) {
+  ensureGuildStorage(guildId);
+  const filePath = path.join(DATA_DIR, guildId, 'tickets_live.json');
+  try {
+    if (fs.existsSync(filePath)) {
+      const tickets = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const filtered = tickets.filter(t => t.channelId !== channelId);
+      fs.writeFileSync(filePath, JSON.stringify(filtered, null, 2));
+    }
+  } catch (err) {
+    console.error('Error removing live ticket:', err);
+  }
+}
 
 /**
  * Builds a clean, fully customizable DM embed without forcing server-specific branding or custom emojis
@@ -110,7 +156,7 @@ function resolveEmojiObject(input, fallbackKey = 'success') {
     }
     return { name: input };
   }
-  return statusEmojiObject(fallbackKey) || { name: fallbackKey === 'success' ? '✅' : '❌' };
+  return statusEmojiObject(fallbackKey) || null;
 }
 
 async function handleActionConfirmation({
@@ -169,13 +215,13 @@ async function handleActionConfirmation({
       try {
         await onConfirm();
       } catch (err) {
-        const errorIcon = statusEmoji('error') || getEmoji('nexus_xmark') || '❌';
+        const errorIcon = statusEmoji('error') || getEmoji('nexus_xmark') || '[Error]';
         const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Action failed: ${err.message}`);
         await interaction.editReply({ embeds: [embed], components: [] });
       }
     } else {
       await i.deferUpdate();
-      const errorIcon = statusEmoji('error') || getEmoji('nexus_xmark') || '❌';
+      const errorIcon = statusEmoji('error') || getEmoji('nexus_xmark') || '[Error]';
       const embed = new EmbedBuilder()
         .setColor('#6B7280')
         .setDescription(`${errorIcon} Action cancelled.`);
@@ -186,7 +232,7 @@ async function handleActionConfirmation({
 
   collector.on('end', (collected, reason) => {
     if (reason === 'time' && collected.size === 0) {
-      const errorIcon = statusEmoji('error') || getEmoji('nexus_xmark') || '❌';
+      const errorIcon = statusEmoji('error') || getEmoji('nexus_xmark') || '[Error]';
       const embed = new EmbedBuilder()
         .setColor('#6B7280')
         .setDescription(`${errorIcon} Confirmation timed out. No action taken.`);
@@ -201,7 +247,7 @@ export default async function handleInteraction(interaction) {
   if (interaction.isChatInputCommand()) {
     const { commandName, guildId, user } = interaction;
     if (!guildId) {
-      const errorIcon = statusEmoji('error') || '❌';
+      const errorIcon = statusEmoji('error') || '[Error]';
       const embed = new EmbedBuilder()
         .setColor('#EF4444')
         .setDescription(`${errorIcon} NexusBot commands can only be used inside Discord servers.`);
@@ -228,7 +274,7 @@ export default async function handleInteraction(interaction) {
     const timeoutIcon = statusEmoji('timeout') || getEmoji('nexus_timeout');
     const userIcon = statusEmoji('user') || getEmoji('nexus_user');
     const loadingIcon = statusEmoji('loading') || getEmoji('nexus_loading');
-    const trashIcon = statusEmoji('trash') || getEmoji('nexus_trash') || '🗑️';
+    const trashIcon = statusEmoji('trash') || getEmoji('nexus_trash') || '[Trash]';
 
     const shieldIcon = statusEmoji('shield') || getEmoji('nexus_shield');
     const automodIcon = statusEmoji('automod') || getEmoji('nexus_automod');
@@ -303,7 +349,7 @@ export default async function handleInteraction(interaction) {
       if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
         const embed = new EmbedBuilder()
           .setColor('#EF4444')
-          .setDescription(`${getCustomEmoji('nexus_cross') || '❌'} **Access Denied**: You require \`ManageGuild\` or \`Administrator\` permission to manage ticket panels.`);
+          .setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} **Access Denied**: You require \`ManageGuild\` or \`Administrator\` permission to manage ticket panels.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -321,7 +367,7 @@ export default async function handleInteraction(interaction) {
 
         const embed = new EmbedBuilder()
           .setColor('#5865F2')
-          .setTitle(`${getCustomEmoji('nexus_ticket') || '🎫'} Ticket System Configuration`)
+          .setTitle(`${getCustomEmoji('nexus_ticket') || '[Ticket]'} Ticket System Configuration`)
           .setDescription(ticketConfig.enabled ? 'Ticket system module is active and configured.' : 'No active ticket configuration found or setup is pending.')
           .addFields(
             { name: 'Panel Title', value: `\`${ticketConfig.panelTitle || 'Default Support Ticket Panel'}\``, inline: true },
@@ -373,7 +419,7 @@ export default async function handleInteraction(interaction) {
 
       addGuildAudit(guildId, 'logs', 'LOG_CHANNEL_UPDATED', `Activity log channel updated to #${channel.name} (${channel.id})`, user.tag);
 
-      const logsIcon = statusEmoji('logs') || statusEmoji('channel') || getEmoji('nexus_logs') || '📜';
+      const logsIcon = statusEmoji('logs') || statusEmoji('channel') || getEmoji('nexus_logs') || '[Logs]';
 
       const embed = new EmbedBuilder()
         .setTitle(`${logsIcon} Activity Log Channel Configured`)
@@ -712,16 +758,16 @@ export default async function handleInteraction(interaction) {
         addGuildAudit(guildId, 'direct-messages', 'DMROLL_COMMAND_SEND', `Sent random DM to ${randomMember.user.tag} (Role filter: ${targetRole ? targetRole.name : 'None'}). Content: ${messageContent}`, interaction.user.tag);
 
         const respEmbed = new EmbedBuilder()
-          .setTitle(`${statusEmoji('cup') || '🎲'} Random DM Roll Winner`)
+          .setTitle(`${statusEmoji('cup') || '[Dice]'} Random DM Roll Winner`)
           .setColor('#10B981')
           .setDescription(`Successfully selected a member at random and dispatched the direct message.`)
           .addFields(
-            { name: `${statusEmoji('user') || '👤'} Winner`, value: `<@${randomMember.id}> (**${randomMember.user.tag}**)`, inline: true },
-            { name: `${statusEmoji('settings') || '🏷️'} Role Filter`, value: targetRole ? `<@&${targetRole.id}>` : '`None (All Members)`', inline: true },
-            { name: `${statusEmoji('message') || '✉️'} Format`, value: shouldEmbed ? '`Rich Embed`' : '`Plain Text`', inline: true },
-            { name: `${statusEmoji('info') || '📝'} Content Preview`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
+            { name: `${statusEmoji('user') || '[Winner]'} Winner`, value: `<@${randomMember.id}> (**${randomMember.user.tag}**)`, inline: true },
+            { name: `${statusEmoji('settings') || '[Role]'} Role Filter`, value: targetRole ? `<@&${targetRole.id}>` : '`None (All Members)`', inline: true },
+            { name: `${statusEmoji('message') || '[Format]'} Format`, value: shouldEmbed ? '`Rich Embed`' : '`Plain Text`', inline: true },
+            { name: `${statusEmoji('info') || '[Preview]'} Content Preview`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
           )
-          .setFooter({ text: `Nexus Random DM Dispatcher` })
+          .setFooter({ text: `Nexus Random DM System` })
           .setTimestamp();
         return interaction.editReply({ embeds: [respEmbed] });
       } catch (err) {
@@ -830,7 +876,7 @@ export default async function handleInteraction(interaction) {
         );
 
       if (activeWarns.length === 0) {
-        embed.setDescription('✨ **Clean Record**: This user has no active warnings in this server.');
+        embed.setDescription('**Clean Record**: This user has no active warnings in this server.');
       } else {
         const listText = activeWarns.slice(-10).map((w, idx) => {
           return `**${idx + 1}.** Case \`${w.caseId}\` • **${w.reason}**\n*Warned by <@${w.executorId}> on ${w.createdAt}*`;
@@ -1823,12 +1869,12 @@ export default async function handleInteraction(interaction) {
 
         if (jsonContent.length <= 1900) {
           return interaction.editReply({
-            content: `📦 **Extracted Embed JSON** (from message \`${targetMessage.id}\`):\n\`\`\`json\n${jsonContent}\n\`\`\``
+            content: `[File] **Extracted Embed JSON** (from message \`${targetMessage.id}\`):\n\`\`\`json\n${jsonContent}\n\`\`\``
           });
         } else {
           const attachment = new AttachmentBuilder(Buffer.from(jsonContent, 'utf-8'), { name: 'embed.json' });
           return interaction.editReply({
-            content: `📦 **Extracted Embed JSON** (Exceeds character limit, attached file for message \`${targetMessage.id}\`):`,
+            content: `[File] **Extracted Embed JSON** (Exceeds character limit, attached file for message \`${targetMessage.id}\`):`,
             files: [attachment]
           });
         }
@@ -1895,7 +1941,7 @@ export default async function handleInteraction(interaction) {
       const fieldName = values[0];
       const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -1929,7 +1975,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('tkt_select_category_', '');
       const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.update({ embeds: [embed], components: [] });
       }
 
@@ -1943,7 +1989,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('tkt_select_component_category_', '');
       const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.update({ embeds: [embed], components: [] });
       }
 
@@ -2015,26 +2061,54 @@ export default async function handleInteraction(interaction) {
         }
 
         const rawWelcome = ticketConfig.welcomeMessage || 'Welcome {user}! Thank you for contacting support. Our staff team will assist you shortly.';
-        const welcomeText = rawWelcome.replace(/\{user\}/g, `<@${interaction.user.id}>`);
+        let welcomeText = rawWelcome.replace(/\{user\}/g, `<@${interaction.user.id}>`);
+        if (ticketConfig.staffRoleId) {
+          welcomeText = welcomeText
+            .replace(/\{role\}/g, `<@&${ticketConfig.staffRoleId}>`)
+            .replace(/\{staff\}/g, `<@&${ticketConfig.staffRoleId}>`);
+        } else {
+          welcomeText = welcomeText
+            .replace(/\{role\}/g, 'Support Staff')
+            .replace(/\{staff\}/g, 'Support Staff');
+        }
+
+        const embedFields = [
+          { name: 'Ticket Ref', value: `\`#${counter}\``, inline: true },
+          { name: 'Opened By', value: `<@${interaction.user.id}>`, inline: true }
+        ];
+
+        if (ticketConfig.staffRoleId) {
+          embedFields.push({ name: 'Support Role', value: `<@&${ticketConfig.staffRoleId}>`, inline: true });
+        }
 
         const welcomeEmbed = new EmbedBuilder()
           .setColor('#5865F2')
           .setTitle(`${getCustomEmoji('nexus_ticket') || '[Ticket]'} Ticket Opened: ${selectedOpt.label}`)
           .setDescription(welcomeText)
-          .addFields(
-            { name: 'Ticket Ref', value: `\`#${counter}\``, inline: true },
-            { name: 'Opened By', value: `<@${interaction.user.id}>`, inline: true }
-          )
+          .addFields(embedFields)
           .setFooter({ text: 'Support Ticket Automation System' })
           .setTimestamp();
 
         const actionRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId('tkt_act_claim').setLabel('Claim Ticket').setStyle(ButtonStyle.Primary).setEmoji(resolveEmojiObject('nexus_createticket', 'createticket')),
-          new ButtonBuilder().setCustomId('tkt_act_close').setLabel('Close Ticket').setStyle(ButtonStyle.Secondary).setEmoji(resolveEmojiObject('nexus_ticket', 'ticket')),
-          new ButtonBuilder().setCustomId('tkt_act_delete').setLabel('Delete Ticket').setStyle(ButtonStyle.Danger).setEmoji(resolveEmojiObject('nexus_cross', 'cross'))
+          new ButtonBuilder().setCustomId('tkt_act_close').setLabel('Close Ticket').setStyle(ButtonStyle.Secondary).setEmoji(resolveEmojiObject('nexus_ticket', 'ticket'))
         );
 
-        await ticketChannel.send({ content: `<@${interaction.user.id}>`, embeds: [welcomeEmbed], components: [actionRow] });
+        saveLiveTicket(interaction.guildId, {
+          channelId: ticketChannel.id,
+          guildId: interaction.guildId,
+          openerId: interaction.user.id,
+          openerTag: interaction.user.tag,
+          openTimestamp: Date.now(),
+          panelName: selectedOpt.label || 'Support Request',
+          ticketName: ticketChannel.name
+        });
+
+        const pingContent = ticketConfig.staffRoleId
+          ? `<@${interaction.user.id}> <@&${ticketConfig.staffRoleId}>`
+          : `<@${interaction.user.id}>`;
+
+        await ticketChannel.send({ content: pingContent, embeds: [welcomeEmbed], components: [actionRow] });
 
         if (ticketConfig.logChannelId && ticketConfig.logChannelId !== interaction.channelId) {
           const logChan = interaction.guild.channels.cache.get(ticketConfig.logChannelId);
@@ -2069,7 +2143,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('chan_select_channel_', '');
       const session = getChannelEmbedSession(sessionId);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.update({ embeds: [embed], components: [] });
       }
 
@@ -2077,7 +2151,7 @@ export default async function handleInteraction(interaction) {
       try {
         const targetChannel = await interaction.guild.channels.fetch(channelId);
         if (!targetChannel) {
-          const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Target channel not found.`);
+          const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Target channel not found.`);
           return interaction.update({ embeds: [embed], components: [] });
         }
 
@@ -2094,13 +2168,13 @@ export default async function handleInteraction(interaction) {
         addGuildAudit(interaction.guildId, 'embeds', 'EMBED_COMMAND_SEND', `Sent custom embed to channel <#${channelId}>`, interaction.user.tag);
 
         const successEmbed = new EmbedBuilder()
-          .setTitle(`${getCustomEmoji('nexus_tick') || '✅'} Embed Sent Successfully`)
+          .setTitle(`${getCustomEmoji('nexus_tick') || '[Success]'} Embed Sent Successfully`)
           .setColor('#10B981')
           .setDescription(`Your custom embed was successfully sent to <#${channelId}>.`)
           .addFields(
-            { name: `${getCustomEmoji('nexus_settings') || '🎯'} Target Channel`, value: `<#${channelId}>`, inline: true },
-            { name: `${getCustomEmoji('nexus_user') || '👤'} Author`, value: `<@${interaction.user.id}>`, inline: true },
-            { name: `${getCustomEmoji('nexus_date') || '🕒'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
+            { name: `${getCustomEmoji('nexus_settings') || '[Target]'} Target Channel`, value: `<#${channelId}>`, inline: true },
+            { name: `${getCustomEmoji('nexus_user') || '[Author]'} Author`, value: `<@${interaction.user.id}>`, inline: true },
+            { name: `${getCustomEmoji('nexus_date') || '[Time]'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
           );
 
         deleteChannelEmbedSession(sessionId);
@@ -2108,7 +2182,7 @@ export default async function handleInteraction(interaction) {
       } catch (err) {
         console.error('[Send Channel Embed Error]', err);
         deleteChannelEmbedSession(sessionId);
-        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Failed to send embed: ${err.message}`);
+        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Failed to send embed: ${err.message}`);
         return interaction.update({ embeds: [errEmbed], components: [] });
       }
     }
@@ -2214,7 +2288,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('tkt_btn_add_button_', '');
       const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
       const modal = createAddTicketButtonModal(sessionId);
@@ -2224,7 +2298,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('tkt_btn_add_menu_', '');
       const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
       const modal = createAddTicketMenuOptionModal(sessionId);
@@ -2244,7 +2318,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('tkt_btn_edit_welcome_', '');
       const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
       const modal = createTicketFieldModal(sessionId, 'welcomeMessage', session.panelData.welcomeMessage);
@@ -2256,7 +2330,7 @@ export default async function handleInteraction(interaction) {
       deleteTicketSetupSession(sessionId);
       const cancelEmbed = new EmbedBuilder()
         .setColor('#EF4444')
-        .setTitle(`${getCustomEmoji('nexus_cross') || '❌'} Ticket Setup Cancelled`)
+        .setTitle(`${getCustomEmoji('nexus_cross') || '[Error]'} Ticket Setup Cancelled`)
         .setDescription('Ticket builder setup prompt cancelled.');
       return interaction.update({ embeds: [cancelEmbed], components: [] });
     }
@@ -2273,7 +2347,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('tkt_btn_deploy_now_', '').replace('tkt_btn_deploy_', '');
       const session = getTicketSetupSession(sessionId);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.update({ embeds: [embed], components: [] });
       }
 
@@ -2371,14 +2445,14 @@ export default async function handleInteraction(interaction) {
 
         const confirmEmbed = new EmbedBuilder()
           .setColor('#10B981')
-          .setTitle(`${getCustomEmoji('nexus_tick') || '✅'} Ticket Panel Deployed`)
+          .setTitle(`${getCustomEmoji('nexus_tick') || '[Success]'} Ticket Panel Deployed`)
           .setDescription(`Successfully sent the interactive ticket panel to <#${targetChannel.id}>.`);
 
         return interaction.update({ embeds: [confirmEmbed], components: [] });
       } catch (err) {
         console.error('[Ticket Deploy Error]', err);
         deleteTicketSetupSession(sessionId);
-        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Failed to deploy ticket panel: ${err.message}`);
+        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Failed to deploy ticket panel: ${err.message}`);
         return interaction.update({ embeds: [errEmbed], components: [] });
       }
     }
@@ -2423,17 +2497,58 @@ export default async function handleInteraction(interaction) {
           ]
         });
 
+        if (ticketConfig.staffRoleId) {
+          await ticketChannel.permissionOverwrites.edit(ticketConfig.staffRoleId, {
+            ViewChannel: true, SendMessages: true, ManageChannels: true
+          }).catch(() => {});
+        }
+
         const rawWelcome = ticketConfig.welcomeMessage || 'Welcome {user}! Thank you for contacting support. Our staff team has been notified and will assist you shortly.';
-        const welcomeText = rawWelcome.replace(/\{user\}/g, `<@${interaction.user.id}>`);
+        let welcomeText = rawWelcome.replace(/\{user\}/g, `<@${interaction.user.id}>`);
+        if (ticketConfig.staffRoleId) {
+          welcomeText = welcomeText
+            .replace(/\{role\}/g, `<@&${ticketConfig.staffRoleId}>`)
+            .replace(/\{staff\}/g, `<@&${ticketConfig.staffRoleId}>`);
+        } else {
+          welcomeText = welcomeText
+            .replace(/\{role\}/g, 'Support Staff')
+            .replace(/\{staff\}/g, 'Support Staff');
+        }
+
+        const embedFields = [
+          { name: 'Ticket Ref', value: `\`#${counter}\``, inline: true },
+          { name: 'Opened By', value: `<@${interaction.user.id}>`, inline: true }
+        ];
+
+        if (ticketConfig.staffRoleId) {
+          embedFields.push({ name: 'Support Role', value: `<@&${ticketConfig.staffRoleId}>`, inline: true });
+        }
+
+        let selectedLabel = 'Support Request';
+        if (customId.startsWith('tkt_action_open_')) {
+          const parts = customId.split('_');
+          const btnIndex = parseInt(parts[3], 10);
+          const clickedBtn = (ticketConfig.buttons || [])[btnIndex];
+          if (clickedBtn && clickedBtn.label) {
+            selectedLabel = clickedBtn.label;
+          }
+        }
+
+        saveLiveTicket(interaction.guildId, {
+          channelId: ticketChannel.id,
+          guildId: interaction.guildId,
+          openerId: interaction.user.id,
+          openerTag: interaction.user.tag,
+          openTimestamp: Date.now(),
+          panelName: selectedLabel,
+          ticketName: ticketChannel.name
+        });
 
         const welcomeEmbed = new EmbedBuilder()
           .setColor('#5865F2')
-          .setTitle(`${getCustomEmoji('nexus_ticket') || '🎫'} Support Ticket Opened`)
+          .setTitle(`${getCustomEmoji('nexus_ticket') || '[Ticket]'} Support Ticket Opened`)
           .setDescription(welcomeText)
-          .addFields(
-            { name: 'Ticket Ref', value: `\`#${counter}\``, inline: true },
-            { name: 'Opened By', value: `<@${interaction.user.id}>`, inline: true }
-          )
+          .addFields(embedFields)
           .setFooter({ text: 'NexusBot Support Ticket Automation' })
           .setTimestamp();
 
@@ -2447,59 +2562,63 @@ export default async function handleInteraction(interaction) {
             .setCustomId('tkt_act_close')
             .setLabel('Close Ticket')
             .setEmoji(resolveEmojiObject('nexus_ticket', 'ticket'))
-            .setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder()
-            .setCustomId('tkt_act_delete')
-            .setLabel('Delete Ticket')
-            .setEmoji(resolveEmojiObject('nexus_cross', 'cross'))
-            .setStyle(ButtonStyle.Danger)
+            .setStyle(ButtonStyle.Secondary)
         );
 
-        await ticketChannel.send({ content: `<@${interaction.user.id}>`, embeds: [welcomeEmbed], components: [actionRow] });
+        const pingContent = ticketConfig.staffRoleId
+          ? `<@${interaction.user.id}> <@&${ticketConfig.staffRoleId}>`
+          : `<@${interaction.user.id}>`;
+
+        await ticketChannel.send({ content: pingContent, embeds: [welcomeEmbed], components: [actionRow] });
 
         const replyEmbed = new EmbedBuilder()
           .setColor('#10B981')
-          .setDescription(`${getCustomEmoji('nexus_tick') || '✅'} Support ticket created: <#${ticketChannel.id}>`);
+          .setDescription(`${getCustomEmoji('nexus_tick') || '[Success]'} Support ticket created: <#${ticketChannel.id}>`);
 
         return interaction.reply({ embeds: [replyEmbed], ephemeral: true });
       } catch (err) {
         console.error('[Ticket Creation Error]', err);
         const errEmbed = new EmbedBuilder()
           .setColor('#EF4444')
-          .setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Failed to create ticket channel: ${err.message}`);
+          .setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Failed to create ticket channel: ${err.message}`);
         return interaction.reply({ embeds: [errEmbed], ephemeral: true });
       }
     }
 
     if (customId === 'tkt_act_claim' || customId === 'ticket_claim') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) && !interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-        return interaction.reply({ content: '❌ Only staff members can claim tickets.', ephemeral: true });
+        return interaction.reply({ content: '[Error] Only staff members can claim tickets.', ephemeral: true });
       }
 
       const claimEmbed = new EmbedBuilder()
         .setColor('#10B981')
-        .setDescription(`${getCustomEmoji('nexus_ticket') || '🎫'} Ticket claimed by <@${interaction.user.id}>. They will handle your inquiry.`);
+        .setDescription(`${getCustomEmoji('nexus_ticket') || '[Ticket]'} Ticket claimed by <@${interaction.user.id}>. They will handle your inquiry.`);
       await interaction.reply({ embeds: [claimEmbed] });
       return;
     }
 
     if (customId === 'tkt_act_close' || customId === 'ticket_close') {
-      try {
-        await interaction.channel.permissionOverwrites.edit(interaction.user.id, {
-          SendMessages: false
-        });
-        const closeEmbed = new EmbedBuilder()
-          .setColor('#F59E0B')
-          .setDescription(`${getCustomEmoji('nexus_lock') || '🔒'} Ticket closed by <@${interaction.user.id}>. Conversation is now archived.`);
-        await interaction.reply({ embeds: [closeEmbed] });
-      } catch (e) {
-        await interaction.reply({ content: `🔒 Ticket closed by <@${interaction.user.id}>.`, ephemeral: true });
-      }
+      const modal = new ModalBuilder()
+        .setCustomId('tkt_modal_close')
+        .setTitle('Close Ticket');
+
+      const reasonInput = new TextInputBuilder()
+        .setCustomId('close_reason')
+        .setLabel('Reason for closing this ticket')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Enter reason (e.g. Issue resolved, inactivity)...')
+        .setRequired(true)
+        .setMaxLength(1000);
+
+      const row = new ActionRowBuilder().addComponents(reasonInput);
+      modal.addComponents(row);
+
+      await interaction.showModal(modal);
       return;
     }
 
     if (customId === 'tkt_act_delete' || customId === 'ticket_delete') {
-      await interaction.reply({ content: '🗑️ Deleting ticket channel in 5 seconds...' });
+      await interaction.reply({ content: 'Deleting ticket channel in 5 seconds...' });
       setTimeout(() => {
         interaction.channel?.delete().catch(() => {});
       }, 5000);
@@ -2547,7 +2666,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('dm_btn_embed_', '');
       const view = getEmbedBuilderViewAndComponents(sessionId);
       if (!view) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '❌'} DM session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_error') || '[Error]'} DM session expired or invalid.`);
         return interaction.update({ embeds: [embed], components: [] });
       }
       return interaction.update({ embeds: view.embeds, components: view.components });
@@ -2558,7 +2677,7 @@ export default async function handleInteraction(interaction) {
       deleteDmSession(sessionId);
       const cancelEmbed = new EmbedBuilder()
         .setColor('#EF4444')
-        .setTitle(`${getCustomEmoji('nexus_cross') || '❌'} Cancelled`)
+        .setTitle(`${getCustomEmoji('nexus_cross') || '[Error]'} Cancelled`)
         .setDescription('Direct message prompt cancelled.');
       return interaction.update({ embeds: [cancelEmbed], components: [] });
     }
@@ -2567,7 +2686,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('chan_btn_send_', '');
       const session = getChannelEmbedSession(sessionId);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.update({ embeds: [embed], components: [] });
       }
       const view = getChannelSelectViewAndComponents(sessionId);
@@ -2579,7 +2698,7 @@ export default async function handleInteraction(interaction) {
       deleteChannelEmbedSession(sessionId);
       const cancelEmbed = new EmbedBuilder()
         .setColor('#EF4444')
-        .setTitle(`${getCustomEmoji('nexus_cross') || '❌'} Cancelled`)
+        .setTitle(`${getCustomEmoji('nexus_cross') || '[Error]'} Cancelled`)
         .setDescription('Embed builder prompt cancelled.');
       return interaction.update({ embeds: [cancelEmbed], components: [] });
     }
@@ -2588,7 +2707,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('dm_btn_send_embed_', '');
       const session = getDmSession(sessionId);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.update({ embeds: [embed], components: [] });
       }
 
@@ -2608,13 +2727,13 @@ export default async function handleInteraction(interaction) {
           addGuildAudit(guildId, 'direct-messages', 'DM_COMMAND_SEND', `Sent DM embed to ${targetUser.tag}`, interaction.user.tag);
 
           const successEmbed = new EmbedBuilder()
-            .setTitle(`${getCustomEmoji('nexus_tick') || '✅'} Direct Message Delivered`)
+            .setTitle(`${getCustomEmoji('nexus_tick') || '[Success]'} Direct Message Delivered`)
             .setColor('#10B981')
             .setDescription(`Your message was successfully delivered to <@${targetUser.id}>.`)
             .addFields(
-              { name: `${getCustomEmoji('nexus_user') || '👤'} Recipient`, value: `**${targetUser.tag || targetUser.username}** (\`${targetUser.id}\`)`, inline: true },
-              { name: `${getCustomEmoji('nexus_info') || '✉️'} Format`, value: '`Custom Embed`', inline: true },
-              { name: `${getCustomEmoji('nexus_date') || '🕒'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
+              { name: `${getCustomEmoji('nexus_user') || '[Recipient]'} Recipient`, value: `**${targetUser.tag || targetUser.username}** (\`${targetUser.id}\`)`, inline: true },
+              { name: `${getCustomEmoji('nexus_info') || '[Format]'} Format`, value: '`Custom Embed`', inline: true },
+              { name: `${getCustomEmoji('nexus_date') || '[Time]'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
             );
 
           deleteDmSession(sessionId);
@@ -2641,13 +2760,13 @@ export default async function handleInteraction(interaction) {
           addGuildAudit(guildId, 'direct-messages', 'DMGLOBAL_COMMAND_SEND', `Sent global DM embed to ${successCount} members (Failed: ${failCount})`, interaction.user.tag);
 
           const successEmbed = new EmbedBuilder()
-            .setTitle(`${getCustomEmoji('nexus_tick') || '📢'} DM Broadcast Completed`)
+            .setTitle(`${getCustomEmoji('nexus_tick') || '[Broadcast]'} DM Broadcast Completed`)
             .setColor('#10B981')
             .setDescription(`Global DM broadcast completed for **${interaction.guild.name}**.`)
             .addFields(
-              { name: `${getCustomEmoji('nexus_tick') || '✅'} Successful Deliveries`, value: `\`${successCount}\` members`, inline: true },
-              { name: `${getCustomEmoji('nexus_cross') || '❌'} Failed Deliveries`, value: `\`${failCount}\` members`, inline: true },
-              { name: `${getCustomEmoji('nexus_settings') || '🎯'} Target Role`, value: targetRole ? `<@&${targetRole.id}>` : '`Entire Server`', inline: true }
+              { name: `${getCustomEmoji('nexus_tick') || '[Success]'} Successful Deliveries`, value: `\`${successCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_cross') || '[Error]'} Failed Deliveries`, value: `\`${failCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_settings') || '[Target]'} Target Role`, value: targetRole ? `<@&${targetRole.id}>` : '`Entire Server`', inline: true }
             );
 
           deleteDmSession(sessionId);
@@ -2656,18 +2775,101 @@ export default async function handleInteraction(interaction) {
       } catch (err) {
         console.error('[DM Send Embed Error]', err);
         deleteDmSession(sessionId);
-        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Failed to send DM: ${err.message}`);
+        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Failed to send DM: ${err.message}`);
         return interaction.editReply({ embeds: [errEmbed], components: [] });
       }
     }
   } else if (interaction.isModalSubmit()) {
     const { customId } = interaction;
 
+    if (customId === 'tkt_modal_close') {
+      const closeReason = interaction.fields.getTextInputValue('close_reason') || 'No reason provided';
+      await interaction.deferReply();
+
+      const guildId = interaction.guildId;
+      const channelId = interaction.channelId;
+
+      // 1. Get live ticket info
+      const liveTicket = getLiveTicket(guildId, channelId);
+
+      const openTimestamp = liveTicket ? liveTicket.openTimestamp : Date.now() - 180000;
+      const openDateStr = new Date(openTimestamp).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).replace(',', '');
+      const closeDateStr = new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).replace(',', '');
+
+      // 2. DM the opener
+      const openerId = liveTicket ? liveTicket.openerId : null;
+      if (openerId) {
+        try {
+          const opener = await interaction.client.users.fetch(openerId);
+          if (opener) {
+            const dmEmbed = new EmbedBuilder()
+              .setColor('#3B82F6')
+              .setTitle('Ticket Closed')
+              .setDescription(`Your ticket has been closed in **${interaction.guild.name}**!\n\n` +
+                `**Ticket Information**\n` +
+                `• **Open Date:** ${openDateStr}\n` +
+                `• **Panel Name:** ${liveTicket ? liveTicket.panelName : 'Support'}\n` +
+                `• **Ticket Name:** ${liveTicket ? liveTicket.ticketName : interaction.channel.name}\n\n` +
+                `**Close Information**\n` +
+                `• **Closed By:** <@${interaction.user.id}>\n` +
+                `• **Close Date:** ${closeDateStr}\n` +
+                `• **Close Reason:** ${closeReason}\n\n` +
+                `*If you have any further questions or concerns, feel free to open a new ticket.*`)
+              .setFooter({ text: 'Nexus Bot | Lucky Dev' });
+
+            await opener.send({ embeds: [dmEmbed] });
+          }
+        } catch (e) {
+          console.error('[Ticket Close] Failed to DM opener:', e);
+        }
+      }
+
+      // 3. Log in log channel
+      const guildSettings = getGuildSettings(guildId);
+      const ticketConfig = guildSettings.tickets || {};
+      if (ticketConfig.logChannelId) {
+        try {
+          const logChan = interaction.guild.channels.cache.get(ticketConfig.logChannelId) || await interaction.guild.channels.fetch(ticketConfig.logChannelId).catch(() => null);
+          if (logChan) {
+            const logEmbed = new EmbedBuilder()
+              .setColor('#EF4444')
+              .setTitle('[Ticket] Ticket Closed')
+              .setDescription(`Ticket \`#${interaction.channel.name}\` has been closed.\n\n` +
+                `**Ticket Information**\n` +
+                `• **Open Date:** ${openDateStr}\n` +
+                `• **Panel Name:** ${liveTicket ? liveTicket.panelName : 'Support'}\n` +
+                `• **Ticket Name:** ${liveTicket ? liveTicket.ticketName : interaction.channel.name}\n` +
+                `• **Opened By:** <@${openerId || 'Unknown'}>\n\n` +
+                `**Close Information**\n` +
+                `• **Closed By:** <@${interaction.user.id}>\n` +
+                `• **Close Date:** ${closeDateStr}\n` +
+                `• **Close Reason:** ${closeReason}`);
+            await logChan.send({ embeds: [logEmbed] }).catch(() => {});
+          }
+        } catch (e) {
+          console.error('[Ticket Close] Failed to send log message:', e);
+        }
+      }
+
+      // 4. Audit Log
+      addGuildAudit(guildId, 'TICKETS', 'TICKET_CLOSED', `Ticket #${interaction.channel.name} closed by ${interaction.user.tag}. Reason: ${closeReason}`, interaction.user.tag);
+
+      // 5. Remove live ticket from storage
+      removeLiveTicket(guildId, channelId);
+
+      // 6. Delete ticket channel in 5 seconds
+      await interaction.editReply({ content: '[Success] Ticket closed. Deleting channel in 5 seconds...' });
+      setTimeout(() => {
+        interaction.channel?.delete().catch(() => {});
+      }, 5000);
+      return;
+    }
+
     if (customId.startsWith('dm_modal_simple_')) {
       const sessionId = customId.replace('dm_modal_simple_', '');
       const session = getDmSession(sessionId);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -2682,14 +2884,14 @@ export default async function handleInteraction(interaction) {
           addGuildAudit(guildId, 'direct-messages', 'DM_COMMAND_SEND', `Sent simple DM to ${targetUser.tag}. Content: ${messageContent}`, interaction.user.tag);
 
           const successEmbed = new EmbedBuilder()
-            .setTitle(`${getCustomEmoji('nexus_tick') || '✅'} Direct Message Delivered`)
+            .setTitle(`${getCustomEmoji('nexus_tick') || '[Success]'} Direct Message Delivered`)
             .setColor('#10B981')
             .setDescription(`Your message was successfully delivered to <@${targetUser.id}>.`)
             .addFields(
-              { name: `${getCustomEmoji('nexus_user') || '👤'} Recipient`, value: `**${targetUser.tag || targetUser.username}** (\`${targetUser.id}\`)`, inline: true },
-              { name: `${getCustomEmoji('nexus_info') || '✉️'} Format`, value: '`Plain Text`', inline: true },
-              { name: `${getCustomEmoji('nexus_date') || '🕒'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true },
-              { name: `${getCustomEmoji('nexus_message') || '📝'} Content`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
+              { name: `${getCustomEmoji('nexus_user') || '[User]'} Recipient`, value: `**${targetUser.tag || targetUser.username}** (\`${targetUser.id}\`)`, inline: true },
+              { name: `${getCustomEmoji('nexus_info') || '[Info]'} Format`, value: '`Plain Text`', inline: true },
+              { name: `${getCustomEmoji('nexus_date') || '[Time]'} Time`, value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true },
+              { name: `${getCustomEmoji('nexus_message') || '[Content]'} Content`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
             );
 
           deleteDmSession(sessionId);
@@ -2716,14 +2918,14 @@ export default async function handleInteraction(interaction) {
           addGuildAudit(guildId, 'direct-messages', 'DMGLOBAL_COMMAND_SEND', `Sent global simple DM to ${successCount} members (Failed: ${failCount})`, interaction.user.tag);
 
           const successEmbed = new EmbedBuilder()
-            .setTitle(`${getCustomEmoji('nexus_tick') || '📢'} DM Broadcast Completed`)
+            .setTitle(`${getCustomEmoji('nexus_tick') || '[Broadcast]'} DM Broadcast Completed`)
             .setColor('#10B981')
             .setDescription(`Global DM broadcast completed for **${interaction.guild.name}**.`)
             .addFields(
-              { name: `${getCustomEmoji('nexus_tick') || '✅'} Successful Deliveries`, value: `\`${successCount}\` members`, inline: true },
-              { name: `${getCustomEmoji('nexus_cross') || '❌'} Failed Deliveries`, value: `\`${failCount}\` members`, inline: true },
-              { name: `${getCustomEmoji('nexus_settings') || '🎯'} Target Role`, value: targetRole ? `<@&${targetRole.id}>` : '`Entire Server`', inline: true },
-              { name: `${getCustomEmoji('nexus_message') || '📝'} Content`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
+              { name: `${getCustomEmoji('nexus_tick') || '[Success]'} Successful Deliveries`, value: `\`${successCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_cross') || '[Failed]'} Failed Deliveries`, value: `\`${failCount}\` members`, inline: true },
+              { name: `${getCustomEmoji('nexus_settings') || '[Target]'} Target Role`, value: targetRole ? `<@&${targetRole.id}>` : '`Entire Server`', inline: true },
+              { name: `${getCustomEmoji('nexus_message') || '[Content]'} Content`, value: messageContent.length > 300 ? messageContent.slice(0, 297) + '...' : messageContent }
             );
 
           deleteDmSession(sessionId);
@@ -2732,7 +2934,7 @@ export default async function handleInteraction(interaction) {
       } catch (err) {
         console.error('[Simple DM Modal Error]', err);
         deleteDmSession(sessionId);
-        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Failed to send DM: ${err.message}`);
+        const errEmbed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Failed to send DM: ${err.message}`);
         return interaction.editReply({ embeds: [errEmbed] });
       }
     }
@@ -2745,7 +2947,7 @@ export default async function handleInteraction(interaction) {
 
       const session = getDmSession(sessionId);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -2764,7 +2966,7 @@ export default async function handleInteraction(interaction) {
 
       const session = getChannelEmbedSession(sessionId);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -2779,7 +2981,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('tkt_modal_add_button_', '');
       const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -2800,7 +3002,7 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('tkt_modal_add_menu_option_', '');
       const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
@@ -2827,7 +3029,7 @@ export default async function handleInteraction(interaction) {
 
       const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (!session) {
-        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '❌'} Session expired or invalid.`);
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 

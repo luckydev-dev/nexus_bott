@@ -170,31 +170,31 @@ export function getHelpEmbedAndComponents(category = 'home', context = {}, isDis
         label: 'Main Overview',
         description: 'General info and module overview.',
         value: 'home',
-        emoji: getCustomEmojiObject('nexus_home') || { name: '🏠' }
+        emoji: getCustomEmojiObject('nexus_home') || undefined
       },
       {
         label: 'AutoMod Protection',
         description: 'Spam, link, and duplicate filter settings.',
         value: 'automod',
-        emoji: getCustomEmojiObject('nexus_automod') || { name: '⚙️' }
+        emoji: getCustomEmojiObject('nexus_automod') || undefined
       },
       {
         label: 'Antinuke Security',
         description: 'Protection against rogue admins & deletions.',
         value: 'antinuke',
-        emoji: getCustomEmojiObject('nexus_antinuke') || getCustomEmojiObject('nexus_shield') || { name: '🛡️' }
+        emoji: getCustomEmojiObject('nexus_antinuke') || getCustomEmojiObject('nexus_shield') || undefined
       },
       {
-        label: 'Anti Raid Defense ⭐',
+        label: 'Anti Raid Defense',
         description: 'Anti-Raid, burst join detection & quarantine.',
         value: 'antiraid',
-        emoji: getCustomEmojiObject('nexus_antiraid') || { name: '⚔️' }
+        emoji: getCustomEmojiObject('nexus_antiraid') || undefined
       },
       {
         label: 'Direct Messaging & Utility',
         description: 'Direct messages, userinfo, serverinfo & extract.',
         value: 'utility',
-        emoji: getCustomEmojiObject('nexus_message') || getCustomEmojiObject('nexus_info') || { name: '📬' }
+        emoji: getCustomEmojiObject('nexus_message') || getCustomEmojiObject('nexus_info') || undefined
       }
     ]);
   }
@@ -206,33 +206,42 @@ export function getHelpEmbedAndComponents(category = 'home', context = {}, isDis
   const nextCategory = categoriesList[(currentIndex + 1) % categoriesList.length];
 
   // Button row matching requested style with custom emojis: nexus_firstpage, nexus_previouspage, nexus_cross, nexus_nextpage, nexus_lastpage
-  const btnRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`help_page_first_${firstCategory}`)
-      .setEmoji(getCustomEmojiObject('nexus_firstpage') || '⏪')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(isDisabled),
-    new ButtonBuilder()
-      .setCustomId(`help_page_prev_${prevCategory}`)
-      .setEmoji(getCustomEmojiObject('nexus_previouspage') || '◀️')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(isDisabled),
-    new ButtonBuilder()
-      .setCustomId('help_page_close')
-      .setEmoji(getCustomEmojiObject('nexus_cross') || '❌')
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(isDisabled),
-    new ButtonBuilder()
-      .setCustomId(`help_page_next_${nextCategory}`)
-      .setEmoji(getCustomEmojiObject('nexus_nextpage') || '▶️')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(isDisabled),
-    new ButtonBuilder()
-      .setCustomId(`help_page_last_${lastCategory}`)
-      .setEmoji(getCustomEmojiObject('nexus_lastpage') || '⏩')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(isDisabled)
-  );
+  const btnFirst = new ButtonBuilder()
+    .setCustomId(`help_page_first_${firstCategory}`)
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(isDisabled);
+  const emojiFirst = getCustomEmojiObject('nexus_firstpage');
+  if (emojiFirst) btnFirst.setEmoji(emojiFirst);
+
+  const btnPrev = new ButtonBuilder()
+    .setCustomId(`help_page_prev_${prevCategory}`)
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(isDisabled);
+  const emojiPrev = getCustomEmojiObject('nexus_previouspage');
+  if (emojiPrev) btnPrev.setEmoji(emojiPrev);
+
+  const btnClose = new ButtonBuilder()
+    .setCustomId('help_page_close')
+    .setStyle(ButtonStyle.Danger)
+    .setDisabled(isDisabled);
+  const emojiClose = getCustomEmojiObject('nexus_cross');
+  if (emojiClose) btnClose.setEmoji(emojiClose);
+
+  const btnNext = new ButtonBuilder()
+    .setCustomId(`help_page_next_${nextCategory}`)
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(isDisabled);
+  const emojiNext = getCustomEmojiObject('nexus_nextpage');
+  if (emojiNext) btnNext.setEmoji(emojiNext);
+
+  const btnLast = new ButtonBuilder()
+    .setCustomId(`help_page_last_${lastCategory}`)
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(isDisabled);
+  const emojiLast = getCustomEmojiObject('nexus_lastpage');
+  if (emojiLast) btnLast.setEmoji(emojiLast);
+
+  const btnRow = new ActionRowBuilder().addComponents(btnFirst, btnPrev, btnClose, btnNext, btnLast);
 
   const menuRow = new ActionRowBuilder().addComponents(selectMenu);
 

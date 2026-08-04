@@ -9,10 +9,10 @@ export async function handleChannelUpdate(oldChannel, newChannel) {
   if (!newChannel.guild) return;
   const changes = [];
   if (oldChannel.name !== newChannel.name) {
-    changes.push({ name: 'Name Changed', value: `\`${oldChannel.name}\` ➔ \`${newChannel.name}\``, inline: true });
+    changes.push({ name: 'Name Changed', value: `\`${oldChannel.name}\` -> \`${newChannel.name}\``, inline: true });
   }
   if (oldChannel.topic !== newChannel.topic) {
-    changes.push({ name: 'Topic Changed', value: `\`${oldChannel.topic || 'None'}\` ➔ \`${newChannel.topic || 'None'}\``, inline: false });
+    changes.push({ name: 'Topic Changed', value: `\`${oldChannel.topic || 'None'}\` -> \`${newChannel.topic || 'None'}\``, inline: false });
   }
   if (changes.length > 0) {
     const isCategory = newChannel.type === 4;
@@ -30,10 +30,10 @@ export async function handleRoleUpdate(oldRole, newRole) {
   if (!newRole.guild) return;
   const changes = [];
   if (oldRole.name !== newRole.name) {
-    changes.push({ name: 'Role Name', value: `\`${oldRole.name}\` ➔ \`${newRole.name}\``, inline: true });
+    changes.push({ name: 'Role Name', value: `\`${oldRole.name}\` -> \`${newRole.name}\``, inline: true });
   }
   if (oldRole.color !== newRole.color) {
-    changes.push({ name: 'Role Color', value: `\`#${oldRole.color.toString(16)}\` ➔ \`#${newRole.color.toString(16)}\``, inline: true });
+    changes.push({ name: 'Role Color', value: `\`#${oldRole.color.toString(16)}\` -> \`#${newRole.color.toString(16)}\``, inline: true });
   }
   if (changes.length > 0) {
     await logActivity(

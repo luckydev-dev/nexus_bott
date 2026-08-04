@@ -68,7 +68,7 @@ async function handlePrefixCommand(message, settings) {
     const supportUrl = 'https://discord.gg/Dz3Rgc7FKn';
     const webUrl = 'https://nexusbot.dev';
 
-    const arrowIcon = getCustomEmoji('nexus_arrowright') || '➔';
+    const arrowIcon = getCustomEmoji('nexus_arrowright') || '->';
 
     const embed = new EmbedBuilder()
       .setTitle('Thanks for adding me!')
@@ -108,11 +108,11 @@ async function handlePrefixCommand(message, settings) {
   const author = message.author;
   const member = message.member;
 
-  const successIcon = statusEmoji('success') || getEmoji('nexus_success') || '✅';
-  const errorIcon = statusEmoji('error') || getEmoji('nexus_error') || '❌';
-  const shieldIcon = statusEmoji('automod') || getEmoji('nexus_automod') || '🛡️';
-  const lockIcon = statusEmoji('lock') || getEmoji('nexus_lock') || '🔒';
-  const banIcon = statusEmoji('ban') || getEmoji('nexus_ban') || '🔨';
+  const successIcon = statusEmoji('success') || getEmoji('nexus_success') || '[Success]';
+  const errorIcon = statusEmoji('error') || getEmoji('nexus_error') || '[Error]';
+  const shieldIcon = statusEmoji('automod') || getEmoji('nexus_automod') || '[Shield]';
+  const lockIcon = statusEmoji('lock') || getEmoji('nexus_lock') || '[Lock]';
+  const banIcon = statusEmoji('ban') || getEmoji('nexus_ban') || '[Ban]';
   const userIcon = getEmoji('nexus_user') || getEmoji('nexus_member');
 
   // Command 1: extractembed / embedjson
@@ -145,12 +145,12 @@ async function handlePrefixCommand(message, settings) {
 
       if (jsonContent.length <= 1900) {
         await message.reply({
-          content: `📦 **Extracted Embed JSON** (from message \`${targetMessage.id}\`):\n\`\`\`json\n${jsonContent}\n\`\`\``
+          content: `[File] **Extracted Embed JSON** (from message \`${targetMessage.id}\`):\n\`\`\`json\n${jsonContent}\n\`\`\``
         });
       } else {
         const attachment = new AttachmentBuilder(Buffer.from(jsonContent, 'utf-8'), { name: 'embed.json' });
         await message.reply({
-          content: `📦 **Extracted Embed JSON** (Exceeds character limit, attached file for message \`${targetMessage.id}\`):`,
+          content: `[File] **Extracted Embed JSON** (Exceeds character limit, attached file for message \`${targetMessage.id}\`):`,
           files: [attachment]
         });
       }
@@ -166,7 +166,7 @@ async function handlePrefixCommand(message, settings) {
   if (command === 'ping') {
     const embed = new EmbedBuilder()
       .setColor('#3B82F6')
-      .setDescription(`🏓 **Pong!**\nLatency: \`${Date.now() - message.createdTimestamp}ms\` | WebSocket Ping: \`${Math.round(message.client.ws.ping)}ms\``);
+      .setDescription(`[Pong] **Pong!**\nLatency: \`${Date.now() - message.createdTimestamp}ms\` | WebSocket Ping: \`${Math.round(message.client.ws.ping)}ms\``);
     await message.reply({ embeds: [embed] });
     return true;
   }
@@ -462,7 +462,7 @@ async function handlePrefixCommand(message, settings) {
         });
       });
     } else {
-      embed.addFields({ name: 'Status', value: '✅ Clean record! No active warnings.' });
+      embed.addFields({ name: 'Status', value: '[Clean] Clean record! No active warnings.' });
     }
     await message.reply({ embeds: [embed] });
     return true;
@@ -764,7 +764,7 @@ async function handlePrefixCommand(message, settings) {
     }
 
     const reason = args.slice(3).join(' ') || 'Mass role execution';
-    const statusMsg = await message.reply({ embeds: [new EmbedBuilder().setColor('#3B82F6').setDescription(`⏳ Processing mass role action... Please wait.`)] });
+    const statusMsg = await message.reply({ embeds: [new EmbedBuilder().setColor('#3B82F6').setDescription(`[Processing] Processing mass role action... Please wait.`)] });
 
     try {
       const members = await guild.members.fetch();
@@ -1007,7 +1007,7 @@ async function handlePrefixCommand(message, settings) {
 
       const embed = new EmbedBuilder()
         .setColor('#5865F2')
-        .setTitle(`${getEmoji('nexus_ticket') || '🎫'} Ticket System Configuration`)
+        .setTitle(`${getEmoji('nexus_ticket') || '[Ticket]'} Ticket System Configuration`)
         .setDescription(ticketConfig.enabled ? 'Ticket system module is active and configured.' : 'No active ticket configuration found or setup is pending.')
         .addFields(
           { name: 'Panel Title', value: `\`${ticketConfig.panelTitle || 'Default Support Ticket Panel'}\``, inline: true },
@@ -1022,14 +1022,17 @@ async function handlePrefixCommand(message, settings) {
         new ButtonBuilder()
           .setCustomId(`tkt_btn_config_edit_${guildId}`)
           .setLabel('Edit Ticket Configuration')
-          .setEmoji(getEmoji('nexus_settings') || { name: '⚙️' })
           .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
           .setCustomId(`tkt_btn_config_deploy_new_${guildId}`)
           .setLabel('Deploy New Panel')
-          .setEmoji(getEmoji('nexus_tick') || { name: '🚀' })
           .setStyle(ButtonStyle.Success)
       );
+
+      const settingsEmoji = getEmoji('nexus_settings');
+      if (settingsEmoji) row.components[0].setEmoji(settingsEmoji);
+      const tickEmoji = getEmoji('nexus_tick');
+      if (tickEmoji) row.components[1].setEmoji(tickEmoji);
 
       await message.reply({ embeds: [embed], components: [row] });
       return true;

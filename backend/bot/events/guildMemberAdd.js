@@ -88,12 +88,12 @@ export default async function handleGuildMemberAdd(member) {
 
         if (raidAction === 'timeout') {
           await member.timeout(1000 * 60 * 60 * 24, `NexusBot AntiRaid: ${flagReason}`);
-          await member.send(`🔒 You have been timed out/quarantined temporarily in **${member.guild.name}** due to security alert: ${flagReason}`).catch(() => {});
+          await member.send(`[Security] You have been timed out/quarantined temporarily in **${member.guild.name}** due to security alert: ${flagReason}`).catch(() => {});
         } else if (raidAction === 'kick') {
-          await member.send(`🔒 You were kicked from **${member.guild.name}** under server security guidelines: ${flagReason}`).catch(() => {});
+          await member.send(`[Security] You were kicked from **${member.guild.name}** under server security guidelines: ${flagReason}`).catch(() => {});
           await member.kick(`NexusBot AntiRaid: ${flagReason}`);
         } else if (raidAction === 'ban') {
-          await member.send(`🔒 You have been banned from **${member.guild.name}** for security safety: ${flagReason}`).catch(() => {});
+          await member.send(`[Security] You have been banned from **${member.guild.name}** for security safety: ${flagReason}`).catch(() => {});
           await member.ban({ reason: `NexusBot AntiRaid: ${flagReason}` });
         }
       } catch (e) {

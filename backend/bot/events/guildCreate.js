@@ -15,8 +15,8 @@ export async function handleGuildCreate(guild) {
     const supportUrl = 'https://discord.gg/Dz3Rgc7FKn';
     const websiteUrl = 'https://nexusbot.dev';
 
-    const arrowIcon = getCustomEmoji('nexus_arrowright') || '➔';
-    const ownerIcon = getCustomEmoji('nexus_owner') || '🛠️';
+    const arrowIcon = getCustomEmoji('nexus_arrowright') || '->';
+    const ownerIcon = getCustomEmoji('nexus_owner') || '[Owner]';
 
     // 1. Channel Welcome Embed
     const channelEmbed = new EmbedBuilder()

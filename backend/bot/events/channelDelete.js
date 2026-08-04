@@ -77,11 +77,11 @@ export default async function handleChannelDelete(channel) {
           // 2. Perform defined threat action
           const action = settings.antinuke.action || 'remove_roles';
           if (action === 'ban') {
-            await member.send(`🚨 You have been banned from **${channel.guild.name}** for breaching the Anti-Nuke security thresholds.`).catch(() => {});
+            await member.send(`[Security] You have been banned from **${channel.guild.name}** for breaching the Anti-Nuke security thresholds.`).catch(() => {});
             await member.ban({ reason: 'NexusBot AntiNuke: Exceeded channel deletion threshold' });
             addGuildAudit(guildId, 'antinuke', 'MEMBER_BAN', `Banned offending operator ${executorTag}`, 'NexusBot AntiNuke');
           } else if (action === 'kick') {
-            await member.send(`🚨 You have been kicked from **${channel.guild.name}** for breaching the Anti-Nuke security thresholds.`).catch(() => {});
+            await member.send(`[Security] You have been kicked from **${channel.guild.name}** for breaching the Anti-Nuke security thresholds.`).catch(() => {});
             await member.kick('NexusBot AntiNuke: Exceeded channel deletion threshold');
             addGuildAudit(guildId, 'antinuke', 'MEMBER_KICK', `Kicked offending operator ${executorTag}`, 'NexusBot AntiNuke');
           } else if (action === 'timeout') {
