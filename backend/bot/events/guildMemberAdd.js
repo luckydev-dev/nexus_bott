@@ -7,6 +7,7 @@ import { EmbedBuilder } from 'discord.js';
 import { getGuildSettings, addGuildAudit } from '../storage.js';
 import { logAntiRaidTrigger } from '../utils/logger.js';
 import { issueWarning } from '../utils/warnings.js';
+import { getCustomEmoji } from '../utils/customEmojis.js';
 
 // In-memory join velocity tracker
 const joinHistory = new Map(); // guildId -> array of timestamps
@@ -88,12 +89,12 @@ export default async function handleGuildMemberAdd(member) {
 
         if (raidAction === 'timeout') {
           await member.timeout(1000 * 60 * 60 * 24, `NexusBot AntiRaid: ${flagReason}`);
-          await member.send(`[Security] You have been timed out/quarantined temporarily in **${member.guild.name}** due to security alert: ${flagReason}`).catch(() => {});
+          await member.send(`${getCustomEmoji('nexus_shield')} You have been timed out/quarantined temporarily in **${member.guild.name}** due to security alert: ${flagReason}`).catch(() => {});
         } else if (raidAction === 'kick') {
-          await member.send(`[Security] You were kicked from **${member.guild.name}** under server security guidelines: ${flagReason}`).catch(() => {});
+          await member.send(`${getCustomEmoji('nexus_shield')} You were kicked from **${member.guild.name}** under server security guidelines: ${flagReason}`).catch(() => {});
           await member.kick(`NexusBot AntiRaid: ${flagReason}`);
         } else if (raidAction === 'ban') {
-          await member.send(`[Security] You have been banned from **${member.guild.name}** for security safety: ${flagReason}`).catch(() => {});
+          await member.send(`${getCustomEmoji('nexus_shield')} You have been banned from **${member.guild.name}** for security safety: ${flagReason}`).catch(() => {});
           await member.ban({ reason: `NexusBot AntiRaid: ${flagReason}` });
         }
       } catch (e) {

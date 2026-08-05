@@ -7,6 +7,7 @@ import { AuditLogEvent } from 'discord.js';
 import { getGuildSettings, addGuildAudit } from '../storage.js';
 import { logAntiNukeTrigger } from '../utils/logger.js';
 import { issueWarning } from '../utils/warnings.js';
+import { getCustomEmoji } from '../utils/customEmojis.js';
 
 // In-memory counters for Anti-Nuke
 const roleDeletionTrackers = new Map(); // guildId -> array of timestamps
@@ -69,11 +70,11 @@ async function punishCulprit(guild, executor, actionType, threshold, count, reas
 
       // 2. Perform defined threat action
       if (action === 'ban') {
-        await member.send(`[Security] You have been banned from **${guild.name}** for breaching the Anti-Nuke safety limit: ${reasonText}`).catch(() => {});
+        await member.send(`${getCustomEmoji('nexus_shield')} You have been banned from **${guild.name}** for breaching the Anti-Nuke safety limit: ${reasonText}`).catch(() => {});
         await member.ban({ reason: `NexusBot AntiNuke: Exceeded threshold for ${actionType}` });
         addGuildAudit(guildId, 'antinuke', 'MEMBER_BAN', `Banned culprit ${executor.tag}`, 'NexusBot AntiNuke');
       } else if (action === 'kick') {
-        await member.send(`[Security] You have been kicked from **${guild.name}** for breaching the Anti-Nuke safety limit: ${reasonText}`).catch(() => {});
+        await member.send(`${getCustomEmoji('nexus_shield')} You have been kicked from **${guild.name}** for breaching the Anti-Nuke safety limit: ${reasonText}`).catch(() => {});
         await member.kick(`NexusBot AntiNuke: Exceeded threshold for ${actionType}`);
         addGuildAudit(guildId, 'antinuke', 'MEMBER_KICK', `Kicked culprit ${executor.tag}`, 'NexusBot AntiNuke');
       } else if (action === 'timeout') {

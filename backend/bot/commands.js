@@ -858,6 +858,86 @@ export const commands = [
         name: 'config',
         description: 'View or manage active ticket panel configurations',
         type: 1 // SUB_COMMAND
+      },
+      {
+        name: 'open',
+        description: 'Open a support ticket directly',
+        type: 1, // SUB_COMMAND
+        options: [
+          {
+            name: 'user',
+            description: 'The user to open the ticket for (Staff only)',
+            type: 6, // USER
+            required: false
+          },
+          {
+            name: 'problem',
+            description: 'The reason or problem details for opening the ticket',
+            type: 3, // STRING
+            required: false
+          }
+        ]
+      },
+      {
+        name: 'close',
+        description: 'Close the current ticket channel',
+        type: 1, // SUB_COMMAND
+        options: [
+          {
+            name: 'reason',
+            description: 'The reason for closing the ticket',
+            type: 3, // STRING
+            required: false
+          }
+        ]
+      },
+      {
+        name: 'transcript',
+        description: 'Generate a text or HTML transcript of the current ticket channel',
+        type: 1, // SUB_COMMAND
+        options: [
+          {
+            name: 'format',
+            description: 'Select transcript format',
+            type: 3, // STRING
+            required: false,
+            choices: [
+              { name: 'Plain Text (.txt)', value: 'text' },
+              { name: 'HTML (.html)', value: 'html' }
+            ]
+          }
+        ]
+      },
+      {
+        name: 'add',
+        description: 'Add a member to the current ticket channel',
+        type: 1, // SUB_COMMAND
+        options: [
+          {
+            name: 'user',
+            description: 'The member to add to this ticket',
+            type: 6, // USER
+            required: true
+          }
+        ]
+      },
+      {
+        name: 'remove',
+        description: 'Remove a member from the current ticket channel',
+        type: 1, // SUB_COMMAND
+        options: [
+          {
+            name: 'user',
+            description: 'The member to remove from this ticket',
+            type: 6, // USER
+            required: true
+          }
+        ]
+      },
+      {
+        name: 'claim',
+        description: 'Claim the current ticket channel',
+        type: 1 // SUB_COMMAND
       }
     ]
   }

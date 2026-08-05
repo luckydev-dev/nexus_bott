@@ -108,11 +108,11 @@ async function handlePrefixCommand(message, settings) {
   const author = message.author;
   const member = message.member;
 
-  const successIcon = statusEmoji('success') || getEmoji('nexus_success') || '[Success]';
-  const errorIcon = statusEmoji('error') || getEmoji('nexus_error') || '[Error]';
-  const shieldIcon = statusEmoji('automod') || getEmoji('nexus_automod') || '[Shield]';
-  const lockIcon = statusEmoji('lock') || getEmoji('nexus_lock') || '[Lock]';
-  const banIcon = statusEmoji('ban') || getEmoji('nexus_ban') || '[Ban]';
+  const successIcon = statusEmoji('success') || getEmoji('nexus_tick');
+  const errorIcon = statusEmoji('error') || getEmoji('nexus_cross');
+  const shieldIcon = statusEmoji('automod') || getEmoji('nexus_automod');
+  const lockIcon = statusEmoji('lock') || getEmoji('nexus_lock');
+  const banIcon = statusEmoji('ban') || getEmoji('nexus_cross');
   const userIcon = getEmoji('nexus_user') || getEmoji('nexus_member');
 
   // Command 1: extractembed / embedjson
@@ -1007,7 +1007,7 @@ async function handlePrefixCommand(message, settings) {
 
       const embed = new EmbedBuilder()
         .setColor('#5865F2')
-        .setTitle(`${getEmoji('nexus_ticket') || '[Ticket]'} Ticket System Configuration`)
+        .setTitle(`${getEmoji('nexus_ticket')} Ticket System Configuration`)
         .setDescription(ticketConfig.enabled ? 'Ticket system module is active and configured.' : 'No active ticket configuration found or setup is pending.')
         .addFields(
           { name: 'Panel Title', value: `\`${ticketConfig.panelTitle || 'Default Support Ticket Panel'}\``, inline: true },
