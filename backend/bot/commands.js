@@ -855,6 +855,11 @@ export const commands = [
         type: 1 // SUB_COMMAND
       },
       {
+        name: 'send',
+        description: 'Deploy/send the active ticket panel in the current channel',
+        type: 1 // SUB_COMMAND
+      },
+      {
         name: 'config',
         description: 'View or manage active ticket panel configurations',
         type: 1 // SUB_COMMAND

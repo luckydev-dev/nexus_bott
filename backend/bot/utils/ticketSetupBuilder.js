@@ -602,8 +602,7 @@ export function buildCategorySelectForComponentView(sessionId, guild, componentL
       categories.slice(0, 25).map(cat => ({
         label: cat.name,
         value: cat.id,
-        description: `Route created ticket channels into ${cat.name}`,
-        emoji: getCustomEmojiObject('nexus_settings') || undefined
+        description: `Route created ticket channels into ${cat.name}`
       }))
     );
   } else {
@@ -611,8 +610,7 @@ export function buildCategorySelectForComponentView(sessionId, guild, componentL
       {
         label: 'Default Category',
         value: 'default',
-        description: 'Auto-create tickets at top of server channel list',
-        emoji: getCustomEmojiObject('nexus_settings') || undefined
+        description: 'Auto-create tickets at top of server channel list'
       }
     ]);
   }

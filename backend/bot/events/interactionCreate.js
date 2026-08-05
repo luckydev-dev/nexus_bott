@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, AttachmentBuilder, ChannelType, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, AttachmentBuilder, ChannelType, ModalBuilder, TextInputBuilder, TextInputStyle, OverwriteType } from 'discord.js';
 import { ensureGuildStorage, getGuildSettings, saveGuildSettings, addGuildAudit, DATA_DIR } from '../storage.js';
 import { issueWarning } from '../utils/warnings.js';
 import { statusEmoji, statusEmojiObject } from '../utils/statusEmojis.js';
@@ -68,13 +68,46 @@ async function generateTranscript(channel, format = 'text') {
       
       const timestamp = new Date(msg.createdAt).toLocaleString();
       
+      let attachmentsHtml = '';
+      if (msg.attachments && msg.attachments.size > 0) {
+        msg.attachments.forEach(att => {
+          if (att.contentType && att.contentType.startsWith('image/')) {
+            attachmentsHtml += `
+              <div class="discord-attachment">
+                <img class="discord-attached-image" src="${att.url}" referrerpolicy="no-referrer" alt="Attachment">
+              </div>
+            `;
+          } else {
+            attachmentsHtml += `
+              <div class="discord-attachment">
+                <a href="${att.url}" target="_blank" class="discord-attachment-link">Download Attachment: ${att.name}</a>
+              </div>
+            `;
+          }
+        });
+      }
+
       let embedsHtml = '';
       if (msg.embeds && msg.embeds.length > 0) {
         msg.embeds.forEach(emb => {
+          let fieldsHtml = '';
+          if (emb.fields && emb.fields.length > 0) {
+            fieldsHtml = '<div class="discord-embed-fields">';
+            emb.fields.forEach(f => {
+              fieldsHtml += `
+                <div class="discord-embed-field ${f.inline ? 'inline' : ''}">
+                  <div class="discord-embed-field-name">${f.name || ''}</div>
+                  <div class="discord-embed-field-value">${f.value || ''}</div>
+                </div>
+              `;
+            });
+            fieldsHtml += '</div>';
+          }
           embedsHtml += `
-            <div class="discord-embed" style="border-left-color: ${emb.hexColor || '#202225'}">
+            <div class="discord-embed" style="border-left: 4px solid ${emb.hexColor || '#202225'}">
               ${emb.title ? `<div class="discord-embed-title">${emb.title}</div>` : ''}
               ${emb.description ? `<div class="discord-embed-desc">${emb.description}</div>` : ''}
+              ${fieldsHtml}
             </div>
           `;
         });
@@ -86,9 +119,11 @@ async function generateTranscript(channel, format = 'text') {
           <div class="discord-msg-content">
             <div class="discord-author-info">
               <span class="discord-username">${msg.author.username}</span>
+              ${msg.author.bot ? '<span class="discord-bot-badge">BOT</span>' : ''}
               <span class="discord-timestamp">${timestamp}</span>
             </div>
             <div class="discord-text">${cleanContent}</div>
+            ${attachmentsHtml}
             ${embedsHtml}
           </div>
         </div>
@@ -115,87 +150,178 @@ async function generateTranscript(channel, format = 'text') {
       background-color: #2f3136;
       border-radius: 8px;
       overflow: hidden;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      border: 1px solid #202225;
     }
     .discord-header {
       background-color: #202225;
       padding: 15px 20px;
-      border-bottom: 1px solid #202225;
+      border-bottom: 1px solid #18191c;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
     .discord-channel-name {
-      font-size: 1.2em;
+      font-size: 1.25em;
       font-weight: bold;
       color: #ffffff;
+      display: flex;
+      align-items: center;
+    }
+    .discord-channel-name::before {
+      content: "#";
+      color: #8e9297;
+      margin-right: 4px;
+      font-size: 1.2em;
     }
     .discord-server-name {
       font-size: 0.9em;
       color: #b9bbbe;
+      background: #36393f;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: monospace;
     }
     .discord-messages {
       padding: 20px;
       max-height: 70vh;
       overflow-y: auto;
     }
+    .discord-messages::-webkit-scrollbar {
+      width: 8px;
+    }
+    .discord-messages::-webkit-scrollbar-track {
+      background: #2e3136;
+    }
+    .discord-messages::-webkit-scrollbar-thumb {
+      background: #202225;
+      border-radius: 4px;
+    }
     .discord-message {
       display: flex;
       margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+    .discord-message:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
     }
     .discord-avatar {
       width: 40px;
       height: 40px;
       border-radius: 50%;
       margin-right: 15px;
+      object-fit: cover;
     }
     .discord-msg-content {
       display: flex;
       flex-direction: column;
+      flex: 1;
     }
     .discord-author-info {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       margin-bottom: 5px;
     }
     .discord-username {
-      font-weight: bold;
+      font-weight: 600;
       color: #ffffff;
-      margin-right: 10px;
+      margin-right: 8px;
+      font-size: 0.95em;
+    }
+    .discord-bot-badge {
+      background-color: #5865f2;
+      color: #ffffff;
+      font-size: 0.65em;
+      font-weight: bold;
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-right: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
     .discord-timestamp {
       font-size: 0.75em;
       color: #72767d;
     }
     .discord-text {
-      line-height: 1.4;
+      line-height: 1.5;
       white-space: pre-wrap;
       word-break: break-word;
+      font-size: 0.95em;
+      color: #dcddde;
+    }
+    .discord-attachment {
+      margin-top: 8px;
+    }
+    .discord-attached-image {
+      max-width: 400px;
+      max-height: 300px;
+      border-radius: 4px;
+      border: 1px solid #202225;
+    }
+    .discord-attachment-link {
+      color: #00b0f4;
+      text-decoration: none;
+      font-size: 0.85em;
+    }
+    .discord-attachment-link:hover {
+      text-decoration: underline;
     }
     .discord-embed {
       background-color: #202225;
       border-left: 4px solid #202225;
       border-radius: 4px;
-      padding: 10px 15px;
+      padding: 12px 15px;
       margin-top: 8px;
       max-width: 520px;
     }
     .discord-embed-title {
       font-weight: bold;
       color: #ffffff;
-      margin-bottom: 5px;
+      margin-bottom: 6px;
+      font-size: 0.95em;
     }
     .discord-embed-desc {
-      font-size: 0.9em;
-      line-height: 1.35;
+      font-size: 0.88em;
+      line-height: 1.4;
+      color: #b9bbbe;
+    }
+    .discord-embed-fields {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .discord-embed-field {
+      display: flex;
+      flex-direction: column;
+    }
+    .discord-embed-field.inline {
+      grid-column: span 1;
+    }
+    .discord-embed-field:not(.inline) {
+      grid-column: span 2;
+    }
+    .discord-embed-field-name {
+      font-weight: bold;
+      font-size: 0.8em;
+      color: #ffffff;
+      margin-bottom: 2px;
+    }
+    .discord-embed-field-value {
+      font-size: 0.85em;
+      color: #b9bbbe;
     }
     .discord-footer {
-      background-color: #2f3136;
+      background-color: #202225;
       padding: 15px 20px;
       text-align: center;
       font-size: 0.8em;
       color: #72767d;
-      border-top: 1px solid #202225;
+      border-top: 1px solid #18191c;
     }
     .discord-message-box {
       margin: 15px 20px;
@@ -205,13 +331,14 @@ async function generateTranscript(channel, format = 'text') {
       display: flex;
       align-items: center;
       color: #72767d;
+      font-size: 0.9em;
     }
   </style>
 </head>
 <body>
   <div class="discord-chat-container">
     <div class="discord-header">
-      <div class="discord-channel-name">#${channelName}</div>
+      <div class="discord-channel-name">${channelName}</div>
       <div class="discord-server-name">${guildName} Ticket Transcript</div>
     </div>
     <div class="discord-messages">
@@ -673,7 +800,7 @@ export default async function handleInteraction(interaction) {
       const subcommand = interaction.options.getSubcommand(false) || 'setup';
 
       // Setup & Config need ManageGuild or Administrator
-      if (subcommand === 'setup' || subcommand === 'config') {
+      if (subcommand === 'setup' || subcommand === 'config' || subcommand === 'send') {
         if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
           const embed = new EmbedBuilder()
             .setColor('#EF4444')
@@ -682,9 +809,110 @@ export default async function handleInteraction(interaction) {
         }
 
         if (subcommand === 'setup') {
+          const guildSettings = getGuildSettings(interaction.guildId);
+          if (guildSettings.tickets && guildSettings.tickets.enabled) {
+            const embed = new EmbedBuilder()
+              .setColor('#EAB308')
+              .setDescription(`${getCustomEmoji('nexus_cross') || '[Warning]'} **Ticket System already configured**: A ticket panel setup already exists on this server. Please use the \`/ticket config\` command to manage, edit, or redeploy your active ticket system panel instead of running a fresh setup.`);
+            return interaction.reply({ embeds: [embed], ephemeral: true });
+          }
           const sessionId = createTicketSetupSession({ userId: interaction.user.id, guildId: interaction.guildId });
           const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
           return interaction.reply({ embeds: view.embeds, components: view.components, ephemeral: true });
+        }
+
+        if (subcommand === 'send') {
+          const guildSettings = getGuildSettings(interaction.guildId);
+          const ticketConfig = guildSettings.tickets || {};
+          if (!ticketConfig.enabled) {
+            const embed = new EmbedBuilder()
+              .setColor('#EF4444')
+              .setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} **Not Configured**: Please run \`/ticket setup\` first to configure your ticket panel before deploying it.`);
+            return interaction.reply({ embeds: [embed], ephemeral: true });
+          }
+
+          await interaction.deferReply({ ephemeral: true });
+          try {
+            const deployEmbed = new EmbedBuilder()
+              .setColor(ticketConfig.color && /^#[0-9A-F]{6}$/i.test(ticketConfig.color) ? ticketConfig.color : '#5865F2')
+              .setTitle(ticketConfig.panelTitle || 'Support Ticket Panel')
+              .setDescription(ticketConfig.description || 'Select an option below to open a ticket.')
+              .setTimestamp();
+
+            if (ticketConfig.thumbnail) {
+              deployEmbed.setThumbnail(ticketConfig.thumbnail);
+            } else if (interaction.guild?.iconURL({ dynamic: true })) {
+              deployEmbed.setThumbnail(interaction.guild.iconURL({ dynamic: true }));
+            }
+
+            if (ticketConfig.footer) {
+              deployEmbed.setFooter({ text: ticketConfig.footer });
+            }
+
+            const componentRows = [];
+
+            // Add Buttons Row if custom buttons added
+            if (ticketConfig.buttons && ticketConfig.buttons.length > 0) {
+              const btnRow = new ActionRowBuilder();
+              ticketConfig.buttons.slice(0, 5).forEach((btn, index) => {
+                const emojiObj = resolveEmojiObject(btn.emoji || 'nexus_ticket', 'ticket');
+                const b = new ButtonBuilder()
+                  .setCustomId(`tkt_action_open_${index}_direct`)
+                  .setLabel(btn.label)
+                  .setStyle(ButtonStyle.Primary);
+                if (emojiObj) b.setEmoji(emojiObj);
+                btnRow.addComponents(b);
+              });
+              componentRows.push(btnRow);
+            }
+
+            // Add Select Menu Row if dropdown options added
+            if (ticketConfig.menuOptions && ticketConfig.menuOptions.length > 0) {
+              const selectMenu = new StringSelectMenuBuilder()
+                .setCustomId(`tkt_panel_dropdown_select_direct`)
+                .setPlaceholder('Select a ticket category to open...');
+
+              ticketConfig.menuOptions.slice(0, 25).forEach(opt => {
+                const emojiObj = resolveEmojiObject(opt.emoji || 'nexus_ticket', 'ticket');
+                const optionObj = {
+                  label: opt.label,
+                  value: opt.id,
+                  description: opt.description || `Open ticket for ${opt.label}`
+                };
+                if (emojiObj) optionObj.emoji = emojiObj;
+                selectMenu.addOptions(optionObj);
+              });
+
+              componentRows.push(new ActionRowBuilder().addComponents(selectMenu));
+            }
+
+            // Default fallback button if no custom components added
+            if (componentRows.length === 0) {
+              const defaultRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                  .setCustomId(`tkt_action_open_0_direct`)
+                  .setLabel('General Support')
+                  .setStyle(ButtonStyle.Primary)
+                  .setEmoji(resolveEmojiObject('nexus_ticket', 'ticket'))
+              );
+              componentRows.push(defaultRow);
+            }
+
+            await interaction.channel.send({ embeds: [deployEmbed], components: componentRows });
+
+            addGuildAudit(interaction.guildId, 'TICKETS', 'PANEL_SENT', `Deployed active ticket panel in #${interaction.channel.name}`, interaction.user.tag);
+
+            const confirmEmbed = new EmbedBuilder()
+              .setColor('#10B981')
+              .setDescription(`${getCustomEmoji('nexus_tick') || '[Success]'} **Ticket Panel Deployed**: The ticket panel has been successfully sent to this channel.`);
+            return interaction.editReply({ embeds: [confirmEmbed] });
+          } catch (err) {
+            console.error('[Ticket Send Subcommand Error]', err);
+            const errEmbed = new EmbedBuilder()
+              .setColor('#EF4444')
+              .setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} **Failed to deploy panel**: ${err.message}`);
+            return interaction.editReply({ embeds: [errEmbed] });
+          }
         }
 
         if (subcommand === 'config') {
@@ -786,17 +1014,9 @@ export default async function handleInteraction(interaction) {
 
           const embedFields = [
             { name: 'Ticket Ref', value: `\`#${counter}\``, inline: true },
-            { name: 'Opened For', value: `<@${targetUser.id}>`, inline: true }
-          ];
-
-          if (ticketConfig.staffRoleId) {
-            embedFields.push({ name: 'Support Role', value: `<@&${ticketConfig.staffRoleId}>`, inline: true });
-          }
-
-          embedFields.push(
             { name: 'Problem Details', value: `\`\`\`${problemDesc}\`\`\``, inline: false },
             { name: 'Notice', value: 'Do not share passwords or sensitive information here.', inline: false }
-          );
+          ];
 
           saveLiveTicket(interaction.guildId, {
             channelId: ticketChannel.id,
@@ -817,13 +1037,13 @@ export default async function handleInteraction(interaction) {
             .setTimestamp();
 
           const row1 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('tkt_act_claim').setLabel('Claim Ticket').setEmoji(resolveEmojiObject('nexus_createticket', 'createticket') || '🙋').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId('tkt_act_close').setLabel('Close Ticket').setEmoji(resolveEmojiObject('nexus_ticket', 'ticket') || '🔒').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId('tkt_act_claim').setLabel('Claim Ticket').setEmoji(resolveEmojiObject('nexus_createticket', 'createticket') || undefined).setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('tkt_act_close').setLabel('Close Ticket').setEmoji(resolveEmojiObject('nexus_ticket', 'ticket') || undefined).setStyle(ButtonStyle.Secondary)
           );
 
           const row2 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('tkt_act_reopen').setLabel('Reopen Ticket').setEmoji(resolveEmojiObject('nexus_settings', 'settings') || '🔓').setStyle(ButtonStyle.Primary).setDisabled(true),
-            new ButtonBuilder().setCustomId('tkt_act_delete').setLabel('Delete Ticket').setEmoji(resolveEmojiObject('nexus_cross', 'cross') || '🗑️').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId('tkt_act_reopen').setLabel('Reopen Ticket').setEmoji(resolveEmojiObject('nexus_settings', 'settings') || undefined).setStyle(ButtonStyle.Primary).setDisabled(true),
+            new ButtonBuilder().setCustomId('tkt_act_delete').setLabel('Delete Ticket').setEmoji(resolveEmojiObject('nexus_cross', 'cross') || undefined).setStyle(ButtonStyle.Danger)
           );
 
           const pingContent = ticketConfig.staffRoleId
@@ -945,7 +1165,6 @@ export default async function handleInteraction(interaction) {
         }
 
         addGuildAudit(interaction.guildId, 'TICKETS', 'TICKET_CLOSED', `Ticket #${interaction.channel.name} closed by ${interaction.user.tag}. Reason: ${reason}`, interaction.user.tag);
-        removeLiveTicket(interaction.guildId, interaction.channelId);
 
         // Update welcome message components
         try {
@@ -964,7 +1183,7 @@ export default async function handleInteraction(interaction) {
 
         const closedEmbed = new EmbedBuilder()
           .setColor('#EF4444')
-          .setDescription(`${getCustomEmoji('nexus_ticket') || '🔒'} Ticket closed by <@${interaction.user.id}>.\nReason: \`${reason}\``);
+          .setDescription(`${getCustomEmoji('nexus_ticket') || '[Ticket]'} Ticket closed by <@${interaction.user.id}>.\nReason: \`${reason}\``);
         return interaction.editReply({ embeds: [closedEmbed] });
       }
 
@@ -3115,10 +3334,59 @@ export default async function handleInteraction(interaction) {
       return;
     }
 
+    if (customId === 'tkt_act_reopen' || customId === 'ticket_reopen') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) && !interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
+        return interaction.reply({ content: `${getCustomEmoji('nexus_error')} Only staff members can reopen tickets.`, ephemeral: true });
+      }
+
+      await interaction.deferReply();
+
+      const openerOverwrite = interaction.channel.permissionOverwrites.cache.find(
+        o => o.type === OverwriteType.Member && o.id !== interaction.client.user.id
+      );
+      const openerId = openerOverwrite ? openerOverwrite.id : null;
+
+      if (openerId) {
+        await interaction.channel.permissionOverwrites.edit(openerId, {
+          SendMessages: true
+        }).catch(() => {});
+      }
+
+      try {
+        const messages = await interaction.channel.messages.fetch({ limit: 50 });
+        const botWelcomeMsg = messages.find(m => m.author.id === interaction.client.user.id && m.embeds.length > 0 && m.components.length > 0);
+        if (botWelcomeMsg) {
+          const row1 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('tkt_act_claim').setLabel('Claim Ticket').setEmoji(resolveEmojiObject('nexus_createticket', 'createticket') || undefined).setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId('tkt_act_close').setLabel('Close Ticket').setEmoji(resolveEmojiObject('nexus_ticket', 'ticket') || undefined).setStyle(ButtonStyle.Secondary)
+          );
+
+          const row2 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('tkt_act_reopen').setLabel('Reopen Ticket').setEmoji(resolveEmojiObject('nexus_settings', 'settings') || undefined).setStyle(ButtonStyle.Primary).setDisabled(true),
+            new ButtonBuilder().setCustomId('tkt_act_delete').setLabel('Delete Ticket').setEmoji(resolveEmojiObject('nexus_cross', 'cross') || undefined).setStyle(ButtonStyle.Danger)
+          );
+          await botWelcomeMsg.edit({ components: [row1, row2] }).catch(() => {});
+        }
+      } catch (err) {
+        console.error('Error updating welcome components on reopen:', err);
+      }
+
+      const reopenEmbed = new EmbedBuilder()
+        .setColor('#10B981')
+        .setTitle(`${getCustomEmoji('nexus_ticket')} Ticket Reopened`)
+        .setDescription(`This ticket has been reopened by <@${interaction.user.id}>.\n\nThe ticket opener can now send messages again.`)
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [reopenEmbed] });
+      return;
+    }
+
     if (customId === 'tkt_act_delete' || customId === 'ticket_delete') {
       const guildSettings = getGuildSettings(interaction.guildId);
       const ticketConfig = guildSettings.tickets || {};
       const format = ticketConfig.transcriptType || 'text';
+
+      removeLiveTicket(interaction.guildId, interaction.channelId);
 
       await interaction.reply({ content: `Generating \`${format.toUpperCase()}\` transcript and deleting ticket channel in 5 seconds...` });
 
@@ -3377,14 +3645,48 @@ export default async function handleInteraction(interaction) {
       // 4. Audit Log
       addGuildAudit(guildId, 'TICKETS', 'TICKET_CLOSED', `Ticket #${interaction.channel.name} closed by ${interaction.user.tag}. Reason: ${closeReason}`, interaction.user.tag);
 
-      // 5. Remove live ticket from storage
-      removeLiveTicket(guildId, channelId);
+      // 5. Lock the channel permissions for the opener (remove SendMessages permission)
+      if (openerId) {
+        await interaction.channel.permissionOverwrites.edit(openerId, {
+          SendMessages: false
+        }).catch(() => {});
+      }
 
-      // 6. Delete ticket channel in 5 seconds
-      await interaction.editReply({ content: `${getCustomEmoji('nexus_tick')} Ticket closed. Deleting channel in 5 seconds...` });
-      setTimeout(() => {
-        interaction.channel?.delete().catch(() => {});
-      }, 5000);
+      // 6. Update welcome message components if found
+      try {
+        const messages = await interaction.channel.messages.fetch({ limit: 50 });
+        const botWelcomeMsg = messages.find(m => m.author.id === interaction.client.user.id && m.embeds.length > 0 && m.components.length > 0);
+        if (botWelcomeMsg) {
+          const row1 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('tkt_act_claim').setLabel('Claim Ticket').setEmoji(resolveEmojiObject('nexus_createticket', 'createticket') || undefined).setStyle(ButtonStyle.Primary).setDisabled(true),
+            new ButtonBuilder().setCustomId('tkt_act_close').setLabel('Close Ticket').setEmoji(resolveEmojiObject('nexus_ticket', 'ticket') || undefined).setStyle(ButtonStyle.Secondary).setDisabled(true)
+          );
+
+          const row2 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('tkt_act_reopen').setLabel('Reopen Ticket').setEmoji(resolveEmojiObject('nexus_settings', 'settings') || undefined).setStyle(ButtonStyle.Primary).setDisabled(false),
+            new ButtonBuilder().setCustomId('tkt_act_delete').setLabel('Delete Ticket').setEmoji(resolveEmojiObject('nexus_cross', 'cross') || undefined).setStyle(ButtonStyle.Danger)
+          );
+          await botWelcomeMsg.edit({ components: [row1, row2] }).catch(() => {});
+        }
+      } catch (err) {
+        console.error('Error updating welcome components on close modal:', err);
+      }
+
+      const closedEmbed = new EmbedBuilder()
+        .setColor('#EF4444')
+        .setTitle(`${getCustomEmoji('nexus_ticket')} Ticket Closed`)
+        .setDescription(`This ticket has been closed by <@${interaction.user.id}>.\n\n` +
+          `• **Reason:** ${closeReason}\n` +
+          `• **Close Date:** ${closeDateStr}\n\n` +
+          `The ticket opener has been locked out of sending messages. Staff can still read history, reopen the ticket, or permanently delete the channel below.`)
+        .setTimestamp();
+
+      const newRow1 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('tkt_act_reopen').setLabel('Reopen Ticket').setEmoji(resolveEmojiObject('nexus_settings', 'settings') || undefined).setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('tkt_act_delete').setLabel('Delete Ticket').setEmoji(resolveEmojiObject('nexus_cross', 'cross') || undefined).setStyle(ButtonStyle.Danger)
+      );
+
+      await interaction.editReply({ embeds: [closedEmbed], components: [newRow1] });
       return;
     }
 
@@ -3466,17 +3768,9 @@ export default async function handleInteraction(interaction) {
 
         const embedFields = [
           { name: 'Ticket Ref', value: `\`#${counter}\``, inline: true },
-          { name: 'Opened By', value: `<@${interaction.user.id}>`, inline: true }
-        ];
-
-        if (ticketConfig.staffRoleId) {
-          embedFields.push({ name: 'Support Role', value: `<@&${ticketConfig.staffRoleId}>`, inline: true });
-        }
-
-        embedFields.push(
           { name: 'Category / Topic', value: `\`${selectedLabel}\``, inline: false },
           { name: 'Problem Details', value: `\`\`\`${problemDesc}\`\`\``, inline: false }
-        );
+        ];
 
         if (additionalInfo.trim()) {
           embedFields.push({ name: 'Additional Details', value: `\`\`\`${additionalInfo}\`\`\``, inline: false });
