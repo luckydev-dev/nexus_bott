@@ -4,6 +4,7 @@
  */
 
 import { logActivity } from '../utils/logger.js';
+import { addSnipe } from '../utils/snipes.js';
 
 export async function handleChannelUpdate(oldChannel, newChannel) {
   if (!newChannel.guild) return;
@@ -75,6 +76,10 @@ export async function handleGuildMemberUpdate(oldMember, newMember) {
 
 export async function handleMessageDelete(message) {
   if (!message.guild || message.author?.bot) return;
+  
+  // Save message to in-memory snipe cache
+  addSnipe(message.channel.id, message);
+
   await logActivity(
     message.guild,
     'Message Deleted',

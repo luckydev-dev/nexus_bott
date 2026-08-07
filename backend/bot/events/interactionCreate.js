@@ -12,6 +12,7 @@ import { CUSTOM_EMOJIS, getCustomEmoji } from '../utils/customEmojis.js';
 import { getHelpEmbedAndComponents, setHelpTimeout, clearHelpTimeout } from '../utils/helpEmbed.js';
 import { getServerInfoEmbedAndComponents } from '../utils/serverInfoEmbed.js';
 import { getUserInfoEmbedAndComponents } from '../utils/userInfoEmbed.js';
+import { getSnipes, clearSnipes } from '../utils/snipes.js';
 import {
   createDmSession,
   getDmSession,
@@ -41,6 +42,108 @@ import {
 } from '../utils/ticketSetupBuilder.js';
 import fs from 'fs';
 import path from 'path';
+
+/**
+ * Helper to generate snipe embed and action row components for a channel
+ */
+function buildSnipeEmbedAndComponents(channelId, index, originalAuthorId, client, channelName) {
+  const snipes = getSnipes(channelId);
+  const total = snipes.length;
+
+  if (total === 0) {
+    const embed = new EmbedBuilder()
+      .setColor('#EF4444')
+      .setDescription(`${getCustomEmoji('nexus_error') || ''} **No recently deleted messages found in this channel.**`);
+    return { embeds: [embed], components: [] };
+  }
+
+  // Bound index safely
+  if (index < 0) index = 0;
+  if (index >= total) index = total - 1;
+
+  const snipe = snipes[index];
+
+  // Format UTC datetime: YYYY-MM-DD HH:MM:SS UTC
+  const formatUTC = (date) => {
+    const pad = (num) => String(num).padStart(2, '0');
+    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())} UTC`;
+  };
+
+  const formattedDeletedTime = formatUTC(new Date(snipe.deletedAt));
+  
+  // Format requested time: HH:MM:SS UTC
+  const now = new Date();
+  const pad = (num) => String(num).padStart(2, '0');
+  const formattedRequestedTime = `${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())} UTC`;
+
+  const embed = new EmbedBuilder()
+    .setColor('#EF4444')
+    .setTitle(`${getCustomEmoji('nexus_trash') || ''} Message Deletion Trace #${index + 1}`)
+    .addFields(
+      {
+        name: `${getCustomEmoji('nexus_user') || ''} Author Profile`,
+        value: `\`\`\`\nName: ${snipe.author.username}\nID: ${snipe.author.id}\nMention: <@${snipe.author.id}>\n\`\`\``,
+        inline: false
+      },
+      {
+        name: `${getCustomEmoji('nexus_clock') || ''} Deletion Context`,
+        value: `\`\`\`\nChannel: #${snipe.channel.name || channelName}\nDeleted: ${formattedDeletedTime}\n\`\`\``,
+        inline: false
+      },
+      {
+        name: `${getCustomEmoji('nexus_message') || ''} Original Content`,
+        value: `\`\`\`\n${snipe.content ? snipe.content.slice(0, 1000) : '[No Text Content / Attachment]'}\n\`\`\``,
+        inline: false
+      }
+    )
+    .setFooter({
+      text: `Page ${index + 1} of ${total} | Requested at ${formattedRequestedTime}`,
+      iconURL: client.user.displayAvatarURL()
+    });
+
+  // Build row 1 (navigation buttons)
+  const row1 = new ActionRowBuilder();
+
+  const firstPageBtn = new ButtonBuilder()
+    .setCustomId(`snipe_page_0_${channelId}_${originalAuthorId}`)
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji(resolveEmojiObject('nexus_firstpage', 'tick') || undefined)
+    .setDisabled(index === 0);
+
+  const prevPageBtn = new ButtonBuilder()
+    .setCustomId(`snipe_page_${index - 1}_${channelId}_${originalAuthorId}`)
+    .setStyle(ButtonStyle.Secondary)
+    .setEmoji(resolveEmojiObject('nexus_arrowleft', 'arrowleft') || undefined)
+    .setDisabled(index === 0);
+
+  const nextPageBtn = new ButtonBuilder()
+    .setCustomId(`snipe_page_${index + 1}_${channelId}_${originalAuthorId}`)
+    .setStyle(ButtonStyle.Secondary)
+    .setEmoji(resolveEmojiObject('nexus_arrowright', 'arrowright') || undefined)
+    .setDisabled(index === total - 1);
+
+  const lastPageBtn = new ButtonBuilder()
+    .setCustomId(`snipe_page_${total - 1}_${channelId}_${originalAuthorId}`)
+    .setStyle(ButtonStyle.Primary)
+    .setEmoji(resolveEmojiObject('nexus_lastpage', 'tick') || undefined)
+    .setDisabled(index === total - 1);
+
+  row1.addComponents(firstPageBtn, prevPageBtn, nextPageBtn, lastPageBtn);
+
+  // Build row 2 (delete/dismiss button)
+  const row2 = new ActionRowBuilder();
+  const deleteBtn = new ButtonBuilder()
+    .setCustomId(`snipe_delete_${channelId}_${originalAuthorId}`)
+    .setStyle(ButtonStyle.Danger)
+    .setEmoji(resolveEmojiObject('nexus_trash', 'trash') || undefined);
+
+  row2.addComponents(deleteBtn);
+
+  // If there is only 1 page, we only need to show the Delete button to keep it super clean!
+  // But wait, the screenshot has both rows, let's include both if total > 1, or just row2 if total === 1.
+  // Actually, let's always return both so it is 100% "same as screenshot".
+  return { embeds: [embed], components: [row1, row2] };
+}
 
 /**
  * Helper to generate ticket transcripts (Text or HTML format)
@@ -2811,6 +2914,41 @@ export default async function handleInteraction(interaction) {
       }
     }
 
+    // 34. Snipe command
+    if (commandName === 'snipe') {
+      const guildId = interaction.guildId;
+      const guildSettings = getGuildSettings(guildId);
+      const ticketConfig = guildSettings.tickets || {};
+      const staffRoleId = ticketConfig.staffRoleId;
+
+      // Restrict snipe to staff/moderators
+      const hasPermission = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) || 
+                            interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) || 
+                            interaction.member.permissions.has(PermissionFlagsBits.ManageMessages) || 
+                            (staffRoleId && interaction.member.roles.cache.has(staffRoleId));
+
+      if (!hasPermission) {
+        const errorEmbed = new EmbedBuilder()
+          .setColor('#EF4444')
+          .setDescription(`${getCustomEmoji('nexus_error') || ''} **Only staff members can use the snipe command.**`);
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+      }
+
+      const channelId = interaction.channelId;
+      const snipes = getSnipes(channelId);
+
+      if (snipes.length === 0) {
+        const emptyEmbed = new EmbedBuilder()
+          .setColor('#EF4444')
+          .setDescription(`${getCustomEmoji('nexus_error') || ''} **No recently deleted messages found in this channel.**`);
+        return interaction.reply({ embeds: [emptyEmbed], ephemeral: true });
+      }
+
+      // Generate the initial view (page index 0)
+      const view = buildSnipeEmbedAndComponents(channelId, 0, interaction.user.id, interaction.client, interaction.channel.name);
+      return interaction.reply({ embeds: view.embeds, components: view.components });
+    }
+
     // Catch-all safety check to ensure interaction is ALWAYS acknowledged
     if (!interaction.replied && !interaction.deferred) {
       const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${errorIcon} Command \`/${commandName}\` acknowledged.`);
@@ -3117,6 +3255,51 @@ export default async function handleInteraction(interaction) {
     }
   } else if (interaction.isButton()) {
     const { customId } = interaction;
+
+    if (customId.startsWith('snipe_page_')) {
+      const parts = customId.split('_');
+      const targetIndex = parseInt(parts[2], 10);
+      const channelId = parts[3];
+      const originalAuthorId = parts[4];
+
+      if (interaction.user.id !== originalAuthorId) {
+        const errorEmbed = new EmbedBuilder()
+          .setColor('#EF4444')
+          .setDescription(`${getCustomEmoji('nexus_error') || ''} **Only <@${originalAuthorId}> can navigate this snipe panel.**`);
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+      }
+
+      const view = buildSnipeEmbedAndComponents(channelId, targetIndex, originalAuthorId, interaction.client, interaction.channel.name);
+      return interaction.update({ embeds: view.embeds, components: view.components });
+    }
+
+    if (customId.startsWith('snipe_delete_')) {
+      const parts = customId.split('_');
+      const originalAuthorId = parts[3];
+
+      const guildId = interaction.guildId;
+      const guildSettings = getGuildSettings(guildId);
+      const ticketConfig = guildSettings.tickets || {};
+      const staffRoleId = ticketConfig.staffRoleId;
+      const isStaff = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) || 
+                      interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) || 
+                      interaction.member.permissions.has(PermissionFlagsBits.ManageMessages) || 
+                      (staffRoleId && interaction.member.roles.cache.has(staffRoleId));
+
+      if (interaction.user.id !== originalAuthorId && !isStaff) {
+        const errorEmbed = new EmbedBuilder()
+          .setColor('#EF4444')
+          .setDescription(`${getCustomEmoji('nexus_error') || ''} **Only the requester or staff can dismiss this panel.**`);
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+      }
+
+      try {
+        await interaction.message.delete();
+      } catch (err) {
+        console.error('Failed to delete snipe message:', err);
+      }
+      return;
+    }
 
     // Handle ticket setup builder navigation & actions
     if (customId.startsWith('tkt_btn_step1_next_')) {

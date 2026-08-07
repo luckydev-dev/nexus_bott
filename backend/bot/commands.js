@@ -945,5 +945,9 @@ export const commands = [
         type: 1 // SUB_COMMAND
       }
     ]
+  },
+  {
+    name: 'snipe',
+    description: 'Snipe the most recently deleted message(s) in this channel.'
   }
 ];
