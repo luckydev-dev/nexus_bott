@@ -163,32 +163,27 @@ function buildStep1EmbedBuilderView(sessionId, session, guild) {
       {
         label: 'Edit Title',
         value: 'title',
-        description: 'Set header title for ticket panel',
-        emoji: getCustomEmojiObject('nexus_info') || undefined
+        description: 'Set header title for ticket panel'
       },
       {
         label: 'Edit Description',
         value: 'description',
-        description: 'Set body text for ticket panel',
-        emoji: getCustomEmojiObject('nexus_message') || undefined
+        description: 'Set body text for ticket panel'
       },
       {
         label: 'Edit Accent Color',
         value: 'color',
-        description: 'Set hex color code (e.g. #5865F2)',
-        emoji: getCustomEmojiObject('nexus_settings') || undefined
+        description: 'Set hex color code (e.g. #5865F2)'
       },
       {
         label: 'Edit Thumbnail URL',
         value: 'thumbnail',
-        description: 'Set panel image thumbnail URL',
-        emoji: getCustomEmojiObject('nexus_link') || undefined
+        description: 'Set panel image thumbnail URL'
       },
       {
         label: 'Edit Footer Text',
         value: 'footer',
-        description: 'Set panel footer line',
-        emoji: getCustomEmojiObject('nexus_info') || undefined
+        description: 'Set panel footer line'
       }
     ]);
 
@@ -363,14 +358,12 @@ function buildStep3SettingsView(sessionId, session, guild) {
         {
           label: 'Plain Text File (.txt)',
           value: 'text',
-          description: 'Generates a clean text file containing all message logs',
-          emoji: getCustomEmojiObject('nexus_message') || undefined
+          description: 'Generates a clean text file containing all message logs'
         },
         {
           label: 'HTML File (.html)',
           value: 'html',
-          description: 'Generates a fully-styled HTML page mimicking a Discord channel',
-          emoji: getCustomEmojiObject('nexus_settings') || undefined
+          description: 'Generates a fully-styled HTML page mimicking a Discord channel'
         }
       ]);
 
@@ -468,32 +461,27 @@ function buildStep3SettingsView(sessionId, session, guild) {
       {
         label: 'Edit Welcome Message',
         value: 'welcome_msg',
-        description: 'Set custom greeting message shown in opened tickets',
-        emoji: getCustomEmojiObject('nexus_message') || undefined
+        description: 'Set custom greeting message shown in opened tickets'
       },
       {
         label: 'Configure Log Channel',
         value: 'log_channel',
-        description: 'Set audit log channel for ticket actions',
-        emoji: getCustomEmojiObject('nexus_logs') || undefined
+        description: 'Set audit log channel for ticket actions'
       },
       {
         label: 'Configure Transcript Channel',
         value: 'transcript_channel',
-        description: 'Set channel for deleted ticket transcripts',
-        emoji: getCustomEmojiObject('nexus_channel') || undefined
+        description: 'Set channel for deleted ticket transcripts'
       },
       {
         label: 'Configure Transcript Format',
         value: 'transcript_type',
-        description: 'Set format for deleted ticket transcripts (Text vs HTML)',
-        emoji: getCustomEmojiObject('nexus_settings') || undefined
+        description: 'Set format for deleted ticket transcripts (Text vs HTML)'
       },
       {
         label: 'Configure Staff Support Role',
         value: 'staff_role',
-        description: 'Set role authorized to claim/manage tickets',
-        emoji: getCustomEmojiObject('nexus_roles') || undefined
+        description: 'Set role authorized to claim/manage tickets'
       }
     ]);
 

@@ -296,8 +296,10 @@ export function TicketSetup({ discordUser, triggerToast, addAuditLog }: TicketSe
     if (action === 'claim') {
       updatedTickets = simulatedTickets.map(t => {
         if (t.id === ticketId) {
+          const newChannelName = t.channelName.startsWith('✅') ? t.channelName : `✅${t.channelName}`;
           return {
             ...t,
+            channelName: newChannelName,
             status: 'claimed' as const,
             claimedBy: 'Moderator Alex',
             messages: [

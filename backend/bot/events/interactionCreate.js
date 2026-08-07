@@ -1072,26 +1072,8 @@ export default async function handleInteraction(interaction) {
           return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
-        const reason = interaction.options.getString('reason');
-        if (!reason) {
-          // No reason provided: show the Close Ticket Modal!
-          const modal = new ModalBuilder()
-            .setCustomId('tkt_modal_close')
-            .setTitle('Close Support Ticket');
+        const reason = interaction.options.getString('reason') || 'Closed by staff';
 
-          const reasonInput = new TextInputBuilder()
-            .setCustomId('close_reason')
-            .setLabel('Reason for closing')
-            .setStyle(TextInputStyle.Paragraph)
-            .setPlaceholder('Provide a reason for closing this ticket...')
-            .setRequired(false)
-            .setMaxLength(500);
-
-          modal.addComponents(new ActionRowBuilder().addComponents(reasonInput));
-          return interaction.showModal(modal);
-        }
-
-        // Reason provided: close immediately!
         await interaction.deferReply();
 
         const openTimestamp = liveTicket.openTimestamp || Date.now() - 180000;
@@ -1183,7 +1165,7 @@ export default async function handleInteraction(interaction) {
 
         const closedEmbed = new EmbedBuilder()
           .setColor('#EF4444')
-          .setDescription(`${getCustomEmoji('nexus_ticket') || '[Ticket]'} Ticket closed by <@${interaction.user.id}>.\nReason: \`${reason}\``);
+          .setDescription(`${getCustomEmoji('nexus_ticket') || '[Ticket]'} Ticket closed by <@${interaction.user.id}>.`);
         return interaction.editReply({ embeds: [closedEmbed] });
       }
 
@@ -1291,6 +1273,13 @@ export default async function handleInteraction(interaction) {
         }
 
         await interaction.deferReply();
+
+        if (!interaction.channel.name.startsWith('✅')) {
+          const cleanName = interaction.channel.name.replace(/^✅-?/, '');
+          await interaction.channel.setName(`✅${cleanName}`).catch((err) => {
+            console.error('[Claim Command Rename Error]', err);
+          });
+        }
 
         try {
           const messages = await interaction.channel.messages.fetch({ limit: 50 });
@@ -3089,10 +3078,21 @@ export default async function handleInteraction(interaction) {
       const sessionId = customId.replace('tkt_select_transcript_type_', '');
       const session = getTicketSetupSession(sessionId, interaction.guildId, interaction.user.id);
       if (session) {
-        session.panelData.transcriptType = values[0];
+        const selectedFormat = values[0];
+        session.panelData.transcriptType = selectedFormat;
         session.activeConfigField = null;
+
+        const settings = getGuildSettings(interaction.guildId);
+        if (settings.tickets) {
+          settings.tickets.transcriptType = selectedFormat;
+          saveGuildSettings(interaction.guildId, settings);
+        }
+
         const view = getTicketSetupBuilderViewAndComponents(sessionId, interaction.guild);
         return interaction.update({ embeds: view.embeds, components: view.components });
+      } else {
+        const embed = new EmbedBuilder().setColor('#EF4444').setDescription(`${getCustomEmoji('nexus_cross') || '[Error]'} Session expired or invalid.`);
+        return interaction.update({ embeds: [embed], components: [] });
       }
     }
     if (customId.startsWith('tkt_select_deploy_channel_')) {
@@ -3307,30 +3307,103 @@ export default async function handleInteraction(interaction) {
         return interaction.reply({ content: `${getCustomEmoji('nexus_error')} Only staff members can claim tickets.`, ephemeral: true });
       }
 
+      await interaction.deferReply();
+
+      if (!interaction.channel.name.startsWith('✅')) {
+        const cleanName = interaction.channel.name.replace(/^✅-?/, '');
+        await interaction.channel.setName(`✅${cleanName}`).catch((err) => {
+          console.error('[Claim Button Rename Error]', err);
+        });
+      }
+
+      try {
+        const messages = await interaction.channel.messages.fetch({ limit: 50 });
+        const botWelcomeMsg = messages.find(m => m.author.id === interaction.client.user.id && m.embeds.length > 0);
+        if (botWelcomeMsg) {
+          const receivedEmbed = botWelcomeMsg.embeds[0];
+          const updatedEmbed = EmbedBuilder.from(receivedEmbed);
+
+          const fields = [...receivedEmbed.fields];
+          const claimedByIndex = fields.findIndex(f => f.name === 'Claimed By');
+          if (claimedByIndex >= 0) {
+            fields[claimedByIndex] = { name: 'Claimed By', value: `<@${interaction.user.id}>`, inline: true };
+          } else {
+            fields.push({ name: 'Claimed By', value: `<@${interaction.user.id}>`, inline: true });
+          }
+          updatedEmbed.setFields(fields);
+
+          if (botWelcomeMsg.components && botWelcomeMsg.components.length > 0) {
+            const row1 = ActionRowBuilder.from(botWelcomeMsg.components[0]);
+            row1.components[0] = ButtonBuilder.from(row1.components[0])
+              .setLabel('Claimed')
+              .setEmoji(resolveEmojiObject('nexus_tick', 'tick') || '✔️')
+              .setStyle(ButtonStyle.Success)
+              .setDisabled(true);
+
+            const components = [row1];
+            if (botWelcomeMsg.components[1]) {
+              components.push(ActionRowBuilder.from(botWelcomeMsg.components[1]));
+            }
+
+            await botWelcomeMsg.edit({ embeds: [updatedEmbed], components });
+          } else {
+            await botWelcomeMsg.edit({ embeds: [updatedEmbed] });
+          }
+        }
+      } catch (err) {
+        console.error('[Claim Button Message Edit Error]', err);
+      }
+
       const claimEmbed = new EmbedBuilder()
         .setColor('#10B981')
-        .setDescription(`${getCustomEmoji('nexus_ticket')} Ticket claimed by <@${interaction.user.id}>. They will handle your inquiry.`);
-      await interaction.reply({ embeds: [claimEmbed] });
+        .setDescription(`${getCustomEmoji('nexus_ticket') || '[Ticket]'} Ticket claimed by <@${interaction.user.id}>. They will handle your inquiry.`);
+      await interaction.editReply({ embeds: [claimEmbed] });
       return;
     }
 
     if (customId === 'tkt_act_close' || customId === 'ticket_close') {
-      const modal = new ModalBuilder()
-        .setCustomId('tkt_modal_close')
-        .setTitle('Close Ticket');
+      await interaction.deferReply();
 
-      const reasonInput = new TextInputBuilder()
-        .setCustomId('close_reason')
-        .setLabel('Reason for closing this ticket')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Enter reason (e.g. Issue resolved, inactivity)...')
-        .setRequired(true)
-        .setMaxLength(1000);
+      const openerOverwrite = interaction.channel.permissionOverwrites.cache.find(
+        o => o.type === OverwriteType.Member && o.id !== interaction.client.user.id
+      );
+      const openerId = openerOverwrite ? openerOverwrite.id : null;
 
-      const row = new ActionRowBuilder().addComponents(reasonInput);
-      modal.addComponents(row);
+      if (openerId) {
+        await interaction.channel.permissionOverwrites.edit(openerId, {
+          SendMessages: false
+        }).catch(() => {});
+      }
 
-      await interaction.showModal(modal);
+      try {
+        const messages = await interaction.channel.messages.fetch({ limit: 50 });
+        const botWelcomeMsg = messages.find(m => m.author.id === interaction.client.user.id && m.embeds.length > 0 && m.components.length > 0);
+        if (botWelcomeMsg) {
+          const row1 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('tkt_act_claim').setLabel('Claim Ticket').setEmoji(resolveEmojiObject('nexus_createticket', 'createticket') || undefined).setStyle(ButtonStyle.Primary).setDisabled(true),
+            new ButtonBuilder().setCustomId('tkt_act_close').setLabel('Close Ticket').setEmoji(resolveEmojiObject('nexus_ticket', 'ticket') || undefined).setStyle(ButtonStyle.Secondary).setDisabled(true)
+          );
+
+          const row2 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('tkt_act_reopen').setLabel('Reopen Ticket').setEmoji(resolveEmojiObject('nexus_settings', 'settings') || undefined).setStyle(ButtonStyle.Primary).setDisabled(false),
+            new ButtonBuilder().setCustomId('tkt_act_delete').setLabel('Delete Ticket').setEmoji(resolveEmojiObject('nexus_cross', 'cross') || undefined).setStyle(ButtonStyle.Danger)
+          );
+          await botWelcomeMsg.edit({ components: [row1, row2] }).catch(() => {});
+        }
+      } catch (err) {
+        console.error('Error updating welcome components on close:', err);
+      }
+
+      const closedEmbed = new EmbedBuilder()
+        .setColor('#EF4444')
+        .setDescription(`${getCustomEmoji('nexus_ticket') || '[Ticket]'} Ticket closed by <@${interaction.user.id}>.`);
+
+      const controlRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('tkt_act_reopen').setLabel('Reopen Ticket').setEmoji(resolveEmojiObject('nexus_settings', 'settings') || undefined).setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('tkt_act_delete').setLabel('Delete Ticket').setEmoji(resolveEmojiObject('nexus_cross', 'cross') || undefined).setStyle(ButtonStyle.Danger)
+      );
+
+      await interaction.editReply({ embeds: [closedEmbed], components: [controlRow] });
       return;
     }
 
@@ -3382,37 +3455,22 @@ export default async function handleInteraction(interaction) {
     }
 
     if (customId === 'tkt_act_delete' || customId === 'ticket_delete') {
-      const guildSettings = getGuildSettings(interaction.guildId);
-      const ticketConfig = guildSettings.tickets || {};
-      const format = ticketConfig.transcriptType || 'text';
+      const modal = new ModalBuilder()
+        .setCustomId('tkt_modal_delete')
+        .setTitle('Delete Support Ticket');
 
-      removeLiveTicket(interaction.guildId, interaction.channelId);
+      const reasonInput = new TextInputBuilder()
+        .setCustomId('delete_reason')
+        .setLabel('Reason for deleting ticket')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Provide a reason for deleting this ticket...')
+        .setRequired(false)
+        .setMaxLength(500);
 
-      await interaction.reply({ content: `Generating \`${format.toUpperCase()}\` transcript and deleting ticket channel in 5 seconds...` });
+      const row = new ActionRowBuilder().addComponents(reasonInput);
+      modal.addComponents(row);
 
-      try {
-        const attachment = await generateTranscript(interaction.channel, format);
-        
-        // Post the transcript to the transcriptChannelId if configured
-        if (ticketConfig.transcriptChannelId) {
-          const transChannel = interaction.guild.channels.cache.get(ticketConfig.transcriptChannelId) || await interaction.guild.channels.fetch(ticketConfig.transcriptChannelId).catch(() => null);
-          if (transChannel) {
-            const transEmbed = new EmbedBuilder()
-              .setColor('#EF4444')
-              .setTitle('Ticket Closed & Deleted')
-              .setDescription(`Ticket channel \`#${interaction.channel.name}\` was deleted by <@${interaction.user.id}>.\n\n` +
-                `• **Format:** \`${format.toUpperCase()}\``)
-              .setTimestamp();
-            await transChannel.send({ embeds: [transEmbed], files: [attachment] }).catch(() => {});
-          }
-        }
-      } catch (err) {
-        console.error('Error generating transcript on delete button:', err);
-      }
-
-      setTimeout(() => {
-        interaction.channel?.delete().catch(() => {});
-      }, 5000);
+      await interaction.showModal(modal);
       return;
     }
     if (customId.startsWith('help_page_')) {
@@ -3573,120 +3631,99 @@ export default async function handleInteraction(interaction) {
   } else if (interaction.isModalSubmit()) {
     const { customId } = interaction;
 
-    if (customId === 'tkt_modal_close') {
-      const closeReason = interaction.fields.getTextInputValue('close_reason') || 'No reason provided';
+    if (customId === 'tkt_modal_delete' || customId === 'tkt_modal_close') {
+      let deleteReason = 'No reason provided';
+      try {
+        deleteReason = interaction.fields.getTextInputValue('delete_reason') || interaction.fields.getTextInputValue('close_reason') || 'No reason provided';
+      } catch (e) {
+        deleteReason = 'No reason provided';
+      }
+
       await interaction.deferReply();
 
       const guildId = interaction.guildId;
       const channelId = interaction.channelId;
-
-      // 1. Get live ticket info
       const liveTicket = getLiveTicket(guildId, channelId);
+
+      const guildSettings = getGuildSettings(guildId);
+      const ticketConfig = guildSettings.tickets || {};
+      const format = ticketConfig.transcriptType || 'text';
+
+      removeLiveTicket(guildId, channelId);
 
       const openTimestamp = liveTicket ? liveTicket.openTimestamp : Date.now() - 180000;
       const openDateStr = new Date(openTimestamp).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).replace(',', '');
       const closeDateStr = new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).replace(',', '');
-
-      // 2. DM the opener
       const openerId = liveTicket ? liveTicket.openerId : null;
+
+      // DM opener about deletion
       if (openerId) {
         try {
           const opener = await interaction.client.users.fetch(openerId);
           if (opener) {
             const dmEmbed = new EmbedBuilder()
-              .setColor('#3B82F6')
-              .setTitle('Ticket Closed')
-              .setDescription(`Your ticket has been closed in **${interaction.guild.name}**!\n\n` +
-                `**Ticket Information**\n` +
-                `• **Open Date:** ${openDateStr}\n` +
-                `• **Panel Name:** ${liveTicket ? liveTicket.panelName : 'Support'}\n` +
-                `• **Ticket Name:** ${liveTicket ? liveTicket.ticketName : interaction.channel.name}\n\n` +
-                `**Close Information**\n` +
+              .setColor('#EF4444')
+              .setTitle('Ticket Deleted')
+              .setDescription(`Your support ticket has been closed and deleted in **${interaction.guild.name}**!\n\n` +
                 `• **Closed By:** <@${interaction.user.id}>\n` +
-                `• **Close Date:** ${closeDateStr}\n` +
-                `• **Close Reason:** ${closeReason}\n\n` +
-                `*If you have any further questions or concerns, feel free to open a new ticket.*`)
-              .setFooter({ text: 'Nexus Bot | Lucky Dev' });
-
-            await opener.send({ embeds: [dmEmbed] });
+                `• **Reason:** ${deleteReason}\n` +
+                `• **Date:** ${closeDateStr}\n\n` +
+                `*If you need further assistance, please open a new ticket.*`);
+            await opener.send({ embeds: [dmEmbed] }).catch(() => {});
           }
         } catch (e) {
-          console.error('[Ticket Close] Failed to DM opener:', e);
+          console.error('[Ticket Delete Modal] Failed to DM opener:', e);
         }
       }
 
-      // 3. Log in log channel
-      const guildSettings = getGuildSettings(guildId);
-      const ticketConfig = guildSettings.tickets || {};
+      // Generate and post transcript
+      try {
+        const attachment = await generateTranscript(interaction.channel, format);
+
+        if (ticketConfig.transcriptChannelId) {
+          const transChannel = interaction.guild.channels.cache.get(ticketConfig.transcriptChannelId) || await interaction.guild.channels.fetch(ticketConfig.transcriptChannelId).catch(() => null);
+          if (transChannel) {
+            const transEmbed = new EmbedBuilder()
+              .setColor('#EF4444')
+              .setTitle('Ticket Closed & Deleted')
+              .setDescription(`Ticket channel \`#${interaction.channel.name}\` was deleted by <@${interaction.user.id}>.\n\n` +
+                `• **Reason:** ${deleteReason}\n` +
+                `• **Format:** \`${format.toUpperCase()}\``)
+              .setTimestamp();
+            await transChannel.send({ embeds: [transEmbed], files: [attachment] }).catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.error('Error generating transcript on delete modal:', err);
+      }
+
+      // Log in audit log channel
       if (ticketConfig.logChannelId) {
         try {
           const logChan = interaction.guild.channels.cache.get(ticketConfig.logChannelId) || await interaction.guild.channels.fetch(ticketConfig.logChannelId).catch(() => null);
           if (logChan) {
             const logEmbed = new EmbedBuilder()
               .setColor('#EF4444')
-              .setTitle('[Ticket] Ticket Closed')
-              .setDescription(`Ticket \`#${interaction.channel.name}\` has been closed.\n\n` +
-                `**Ticket Information**\n` +
-                `• **Open Date:** ${openDateStr}\n` +
-                `• **Panel Name:** ${liveTicket ? liveTicket.panelName : 'Support'}\n` +
-                `• **Ticket Name:** ${liveTicket ? liveTicket.ticketName : interaction.channel.name}\n` +
-                `• **Opened By:** <@${openerId || 'Unknown'}>\n\n` +
-                `**Close Information**\n` +
-                `• **Closed By:** <@${interaction.user.id}>\n` +
-                `• **Close Date:** ${closeDateStr}\n` +
-                `• **Close Reason:** ${closeReason}`);
+              .setTitle('[Ticket] Ticket Deleted')
+              .setDescription(`Ticket \`#${interaction.channel.name}\` was permanently deleted.\n\n` +
+                `• **Opened By:** <@${openerId || 'Unknown'}>\n` +
+                `• **Deleted By:** <@${interaction.user.id}>\n` +
+                `• **Reason:** ${deleteReason}\n` +
+                `• **Date:** ${closeDateStr}`);
             await logChan.send({ embeds: [logEmbed] }).catch(() => {});
           }
         } catch (e) {
-          console.error('[Ticket Close] Failed to send log message:', e);
+          console.error('[Ticket Delete Modal] Failed to send log message:', e);
         }
       }
 
-      // 4. Audit Log
-      addGuildAudit(guildId, 'TICKETS', 'TICKET_CLOSED', `Ticket #${interaction.channel.name} closed by ${interaction.user.tag}. Reason: ${closeReason}`, interaction.user.tag);
+      addGuildAudit(guildId, 'TICKETS', 'TICKET_DELETED', `Ticket #${interaction.channel.name} deleted by ${interaction.user.tag}. Reason: ${deleteReason}`, interaction.user.tag);
 
-      // 5. Lock the channel permissions for the opener (remove SendMessages permission)
-      if (openerId) {
-        await interaction.channel.permissionOverwrites.edit(openerId, {
-          SendMessages: false
-        }).catch(() => {});
-      }
+      await interaction.editReply({ content: `${getCustomEmoji('nexus_tick') || '[Done]'} Generating \`${format.toUpperCase()}\` transcript and deleting ticket channel in 5 seconds...` });
 
-      // 6. Update welcome message components if found
-      try {
-        const messages = await interaction.channel.messages.fetch({ limit: 50 });
-        const botWelcomeMsg = messages.find(m => m.author.id === interaction.client.user.id && m.embeds.length > 0 && m.components.length > 0);
-        if (botWelcomeMsg) {
-          const row1 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('tkt_act_claim').setLabel('Claim Ticket').setEmoji(resolveEmojiObject('nexus_createticket', 'createticket') || undefined).setStyle(ButtonStyle.Primary).setDisabled(true),
-            new ButtonBuilder().setCustomId('tkt_act_close').setLabel('Close Ticket').setEmoji(resolveEmojiObject('nexus_ticket', 'ticket') || undefined).setStyle(ButtonStyle.Secondary).setDisabled(true)
-          );
-
-          const row2 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('tkt_act_reopen').setLabel('Reopen Ticket').setEmoji(resolveEmojiObject('nexus_settings', 'settings') || undefined).setStyle(ButtonStyle.Primary).setDisabled(false),
-            new ButtonBuilder().setCustomId('tkt_act_delete').setLabel('Delete Ticket').setEmoji(resolveEmojiObject('nexus_cross', 'cross') || undefined).setStyle(ButtonStyle.Danger)
-          );
-          await botWelcomeMsg.edit({ components: [row1, row2] }).catch(() => {});
-        }
-      } catch (err) {
-        console.error('Error updating welcome components on close modal:', err);
-      }
-
-      const closedEmbed = new EmbedBuilder()
-        .setColor('#EF4444')
-        .setTitle(`${getCustomEmoji('nexus_ticket')} Ticket Closed`)
-        .setDescription(`This ticket has been closed by <@${interaction.user.id}>.\n\n` +
-          `• **Reason:** ${closeReason}\n` +
-          `• **Close Date:** ${closeDateStr}\n\n` +
-          `The ticket opener has been locked out of sending messages. Staff can still read history, reopen the ticket, or permanently delete the channel below.`)
-        .setTimestamp();
-
-      const newRow1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('tkt_act_reopen').setLabel('Reopen Ticket').setEmoji(resolveEmojiObject('nexus_settings', 'settings') || undefined).setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId('tkt_act_delete').setLabel('Delete Ticket').setEmoji(resolveEmojiObject('nexus_cross', 'cross') || undefined).setStyle(ButtonStyle.Danger)
-      );
-
-      await interaction.editReply({ embeds: [closedEmbed], components: [newRow1] });
+      setTimeout(() => {
+        interaction.channel?.delete().catch(() => {});
+      }, 5000);
       return;
     }
 
