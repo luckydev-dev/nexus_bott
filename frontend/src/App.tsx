@@ -71,7 +71,7 @@ export default function App() {
     } else if (segments[0] === 'dashboard') {
       if (activeTab !== 'dashboard') setActiveTab('dashboard');
 
-      const validMenus = ['automod', 'antiraid', 'antinuke', 'whitelist', 'audit', 'warnings', 'tickets'];
+      const validMenus = ['automod', 'antiraid', 'antinuke', 'whitelist', 'audit', 'warnings', 'tickets', 'tickets-config', 'tickets-panels', 'tickets-management'];
 
       if (segments.length === 1) {
         const menu = 'automod';
@@ -1412,22 +1412,52 @@ export default function App() {
               )}
 
               {/* Category: Help Desk & Support */}
-              {(!sidebarSearch || ['tickets', 'support', 'panel', 'config'].some(k => k.includes(sidebarSearch.toLowerCase()))) && (
+              {(!sidebarSearch || ['tickets', 'support', 'panel', 'config', 'management'].some(k => k.includes(sidebarSearch.toLowerCase()))) && (
                 <nav className="space-y-1">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2 font-display">Help Desk & Support</div>
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2 font-display">TICKETS</div>
 
-                  {(!sidebarSearch || 'tickets support config setup'.includes(sidebarSearch.toLowerCase())) && (
+                  {(!sidebarSearch || 'configuration config'.includes(sidebarSearch.toLowerCase())) && (
                     <button
-                      id="nav-tickets"
-                      onClick={() => handleMenuClick('tickets')}
+                      id="nav-tickets-config"
+                      onClick={() => handleMenuClick('tickets-config')}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs transition-all cursor-pointer ${
-                        selectedMenu === 'tickets' 
+                        selectedMenu === 'tickets-config' 
+                          ? 'bg-[#5865F2] text-white font-bold shadow shadow-[#5865F2]/20' 
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <NexusIcon name="settings" fallback={<Settings className="w-4 h-4 text-indigo-400" />} />
+                      <span>Configuration</span>
+                    </button>
+                  )}
+
+                  {(!sidebarSearch || 'tickets panels setup'.includes(sidebarSearch.toLowerCase())) && (
+                    <button
+                      id="nav-tickets-panels"
+                      onClick={() => handleMenuClick('tickets-panels')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs transition-all cursor-pointer ${
+                        selectedMenu === 'tickets-panels' || selectedMenu === 'tickets'
                           ? 'bg-[#5865F2] text-white font-bold shadow shadow-[#5865F2]/20' 
                           : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
                       }`}
                     >
                       <NexusIcon name="ticket" fallback={<Ticket className="w-4 h-4 text-indigo-400" />} />
-                      <span>Ticket System</span>
+                      <span>Ticket Panels</span>
+                    </button>
+                  )}
+
+                  {(!sidebarSearch || 'management tickets logs'.includes(sidebarSearch.toLowerCase())) && (
+                    <button
+                      id="nav-tickets-management"
+                      onClick={() => handleMenuClick('tickets-management')}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs transition-all cursor-pointer ${
+                        selectedMenu === 'tickets-management' 
+                          ? 'bg-[#5865F2] text-white font-bold shadow shadow-[#5865F2]/20' 
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <NexusIcon name="list" fallback={<FileText className="w-4 h-4 text-indigo-400" />} />
+                      <span>Ticket Management</span>
                     </button>
                   )}
                 </nav>
@@ -2646,8 +2676,9 @@ export default function App() {
                   )}
 
                   {/* TICKET SETUP MODULE */}
-                  {selectedMenu === 'tickets' && (
+                  {(selectedMenu === 'tickets' || selectedMenu.startsWith('tickets-')) && (
                     <TicketSetup
+                      activeMenu={selectedMenu}
                       discordUser={discordUser}
                       triggerToast={triggerToast}
                       addAuditLog={addAuditLog}
