@@ -95,7 +95,7 @@ function ensureGuildStorage(guildId) {
 }
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || process.env.SERVER_PORT || 3000;
   app.use(express.json());
   const COOKIE_SECRET = "nexusbot_session_cryptographic_signing_key_99332211";
   app.use(cookieParser(COOKIE_SECRET));
