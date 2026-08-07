@@ -3303,8 +3303,19 @@ export default async function handleInteraction(interaction) {
     }
 
     if (customId === 'tkt_act_claim' || customId === 'ticket_claim') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) && !interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-        return interaction.reply({ content: `${getCustomEmoji('nexus_error')} Only staff members can claim tickets.`, ephemeral: true });
+      const guildSettings = getGuildSettings(interaction.guildId);
+      const ticketConfig = guildSettings.tickets || {};
+      const staffRoleId = ticketConfig.staffRoleId;
+
+      const hasPermission = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) || 
+                            interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) || 
+                            (staffRoleId && interaction.member.roles.cache.has(staffRoleId));
+
+      if (!hasPermission) {
+        const errorEmbed = new EmbedBuilder()
+          .setColor('#EF4444')
+          .setDescription(`${getCustomEmoji('nexus_error') || ''} **Only staff members can claim tickets.**`);
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
       }
 
       await interaction.deferReply();
@@ -3336,7 +3347,7 @@ export default async function handleInteraction(interaction) {
             const row1 = ActionRowBuilder.from(botWelcomeMsg.components[0]);
             row1.components[0] = ButtonBuilder.from(row1.components[0])
               .setLabel('Claimed')
-              .setEmoji(resolveEmojiObject('nexus_tick', 'tick') || '✔️')
+              .setEmoji(resolveEmojiObject('nexus_tick', 'tick') || undefined)
               .setStyle(ButtonStyle.Success)
               .setDisabled(true);
 
@@ -3362,6 +3373,21 @@ export default async function handleInteraction(interaction) {
     }
 
     if (customId === 'tkt_act_close' || customId === 'ticket_close') {
+      const guildSettings = getGuildSettings(interaction.guildId);
+      const ticketConfig = guildSettings.tickets || {};
+      const staffRoleId = ticketConfig.staffRoleId;
+
+      const hasPermission = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) || 
+                            interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) || 
+                            (staffRoleId && interaction.member.roles.cache.has(staffRoleId));
+
+      if (!hasPermission) {
+        const errorEmbed = new EmbedBuilder()
+          .setColor('#EF4444')
+          .setDescription(`${getCustomEmoji('nexus_error') || ''} **Only staff members can close tickets.**`);
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+      }
+
       await interaction.deferReply();
 
       const openerOverwrite = interaction.channel.permissionOverwrites.cache.find(
@@ -3408,8 +3434,19 @@ export default async function handleInteraction(interaction) {
     }
 
     if (customId === 'tkt_act_reopen' || customId === 'ticket_reopen') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) && !interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-        return interaction.reply({ content: `${getCustomEmoji('nexus_error')} Only staff members can reopen tickets.`, ephemeral: true });
+      const guildSettings = getGuildSettings(interaction.guildId);
+      const ticketConfig = guildSettings.tickets || {};
+      const staffRoleId = ticketConfig.staffRoleId;
+
+      const hasPermission = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) || 
+                            interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) || 
+                            (staffRoleId && interaction.member.roles.cache.has(staffRoleId));
+
+      if (!hasPermission) {
+        const errorEmbed = new EmbedBuilder()
+          .setColor('#EF4444')
+          .setDescription(`${getCustomEmoji('nexus_error') || ''} **Only staff members can reopen tickets.**`);
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
       }
 
       await interaction.deferReply();
@@ -3446,7 +3483,7 @@ export default async function handleInteraction(interaction) {
 
       const reopenEmbed = new EmbedBuilder()
         .setColor('#10B981')
-        .setTitle(`${getCustomEmoji('nexus_ticket')} Ticket Reopened`)
+        .setTitle(`${getCustomEmoji('nexus_ticket') || '[Ticket]'} Ticket Reopened`)
         .setDescription(`This ticket has been reopened by <@${interaction.user.id}>.\n\nThe ticket opener can now send messages again.`)
         .setTimestamp();
 
@@ -3455,6 +3492,21 @@ export default async function handleInteraction(interaction) {
     }
 
     if (customId === 'tkt_act_delete' || customId === 'ticket_delete') {
+      const guildSettings = getGuildSettings(interaction.guildId);
+      const ticketConfig = guildSettings.tickets || {};
+      const staffRoleId = ticketConfig.staffRoleId;
+
+      const hasPermission = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) || 
+                            interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) || 
+                            (staffRoleId && interaction.member.roles.cache.has(staffRoleId));
+
+      if (!hasPermission) {
+        const errorEmbed = new EmbedBuilder()
+          .setColor('#EF4444')
+          .setDescription(`${getCustomEmoji('nexus_error') || ''} **Only staff members can delete tickets.**`);
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+      }
+
       const modal = new ModalBuilder()
         .setCustomId('tkt_modal_delete')
         .setTitle('Delete Support Ticket');
@@ -3632,6 +3684,22 @@ export default async function handleInteraction(interaction) {
     const { customId } = interaction;
 
     if (customId === 'tkt_modal_delete' || customId === 'tkt_modal_close') {
+      const guildId = interaction.guildId;
+      const guildSettings = getGuildSettings(guildId);
+      const ticketConfig = guildSettings.tickets || {};
+      const staffRoleId = ticketConfig.staffRoleId;
+
+      const hasPermission = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) || 
+                            interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) || 
+                            (staffRoleId && interaction.member.roles.cache.has(staffRoleId));
+
+      if (!hasPermission) {
+        const errorEmbed = new EmbedBuilder()
+          .setColor('#EF4444')
+          .setDescription(`${getCustomEmoji('nexus_error') || ''} **Only staff members can close or delete tickets.**`);
+        return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+      }
+
       let deleteReason = 'No reason provided';
       try {
         deleteReason = interaction.fields.getTextInputValue('delete_reason') || interaction.fields.getTextInputValue('close_reason') || 'No reason provided';
@@ -3641,12 +3709,8 @@ export default async function handleInteraction(interaction) {
 
       await interaction.deferReply();
 
-      const guildId = interaction.guildId;
       const channelId = interaction.channelId;
       const liveTicket = getLiveTicket(guildId, channelId);
-
-      const guildSettings = getGuildSettings(guildId);
-      const ticketConfig = guildSettings.tickets || {};
       const format = ticketConfig.transcriptType || 'text';
 
       removeLiveTicket(guildId, channelId);
@@ -3663,12 +3727,14 @@ export default async function handleInteraction(interaction) {
           if (opener) {
             const dmEmbed = new EmbedBuilder()
               .setColor('#EF4444')
-              .setTitle('Ticket Deleted')
-              .setDescription(`Your support ticket has been closed and deleted in **${interaction.guild.name}**!\n\n` +
-                `• **Closed By:** <@${interaction.user.id}>\n` +
-                `• **Reason:** ${deleteReason}\n` +
-                `• **Date:** ${closeDateStr}\n\n` +
-                `*If you need further assistance, please open a new ticket.*`);
+              .setTitle('Your Ticket Has Been Closed & Deleted')
+              .setDescription(`Your support ticket channel in **${interaction.guild.name}** has been closed and deleted.`)
+              .addFields(
+                { name: 'Closed By', value: `<@${interaction.user.id}>`, inline: true },
+                { name: 'Reason', value: deleteReason, inline: true },
+                { name: 'Date', value: closeDateStr, inline: false }
+              )
+              .setFooter({ text: 'If you need further assistance, please open a new ticket.' });
             await opener.send({ embeds: [dmEmbed] }).catch(() => {});
           }
         } catch (e) {
@@ -3685,10 +3751,13 @@ export default async function handleInteraction(interaction) {
           if (transChannel) {
             const transEmbed = new EmbedBuilder()
               .setColor('#EF4444')
-              .setTitle('Ticket Closed & Deleted')
-              .setDescription(`Ticket channel \`#${interaction.channel.name}\` was deleted by <@${interaction.user.id}>.\n\n` +
-                `• **Reason:** ${deleteReason}\n` +
-                `• **Format:** \`${format.toUpperCase()}\``)
+              .setTitle('Ticket Transcript Saved')
+              .setDescription(`A transcript has been generated for the deleted ticket channel \`#${interaction.channel.name}\`.`)
+              .addFields(
+                { name: 'Deleted By', value: `<@${interaction.user.id}>`, inline: true },
+                { name: 'Reason', value: deleteReason, inline: true },
+                { name: 'Format', value: `\`${format.toUpperCase()}\``, inline: true }
+              )
               .setTimestamp();
             await transChannel.send({ embeds: [transEmbed], files: [attachment] }).catch(() => {});
           }
@@ -3704,12 +3773,15 @@ export default async function handleInteraction(interaction) {
           if (logChan) {
             const logEmbed = new EmbedBuilder()
               .setColor('#EF4444')
-              .setTitle('[Ticket] Ticket Deleted')
-              .setDescription(`Ticket \`#${interaction.channel.name}\` was permanently deleted.\n\n` +
-                `• **Opened By:** <@${openerId || 'Unknown'}>\n` +
-                `• **Deleted By:** <@${interaction.user.id}>\n` +
-                `• **Reason:** ${deleteReason}\n` +
-                `• **Date:** ${closeDateStr}`);
+              .setTitle('Ticket Permanently Deleted')
+              .setDescription(`The ticket channel \`#${interaction.channel.name}\` has been deleted.`)
+              .addFields(
+                { name: 'Opened By', value: openerId ? `<@${openerId}>` : 'Unknown', inline: true },
+                { name: 'Deleted By', value: `<@${interaction.user.id}>`, inline: true },
+                { name: 'Reason', value: deleteReason, inline: false },
+                { name: 'Date', value: closeDateStr, inline: true }
+              )
+              .setTimestamp();
             await logChan.send({ embeds: [logEmbed] }).catch(() => {});
           }
         } catch (e) {
@@ -3719,7 +3791,17 @@ export default async function handleInteraction(interaction) {
 
       addGuildAudit(guildId, 'TICKETS', 'TICKET_DELETED', `Ticket #${interaction.channel.name} deleted by ${interaction.user.tag}. Reason: ${deleteReason}`, interaction.user.tag);
 
-      await interaction.editReply({ content: `${getCustomEmoji('nexus_tick') || '[Done]'} Generating \`${format.toUpperCase()}\` transcript and deleting ticket channel in 5 seconds...` });
+      const deleteInChannelEmbed = new EmbedBuilder()
+        .setColor('#EF4444')
+        .setTitle('Ticket Channel Deletion')
+        .setDescription(`This ticket channel is being permanently deleted in 5 seconds.`)
+        .addFields(
+          { name: 'Closed By', value: `<@${interaction.user.id}>`, inline: true },
+          { name: 'Reason', value: deleteReason, inline: true }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [deleteInChannelEmbed], content: '' });
 
       setTimeout(() => {
         interaction.channel?.delete().catch(() => {});
